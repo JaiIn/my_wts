@@ -17,7 +17,8 @@
     "test:integration": "vitest run tests/integration",
     "test:safety": "vitest run tests/safety",
     "test:e2e": "playwright test",
-    "check:stage": "node scripts/check-stage.mjs"
+    "check:stage": "node scripts/check-stage.mjs",
+    "spec:check": "redocly lint specs/my-wts-bff-openapi.yaml"
   },
   "dependencies": {
     "@hookform/resolvers": "5.4.0",

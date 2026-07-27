@@ -22,5 +22,8 @@ describe("project foundation", () => {
     expect(packageJson.scripts["check:stage"]).toBe(
       "node scripts/check-stage.mjs",
     );
+    expect(packageJson.scripts["spec:check"]).toBe(
+      "redocly lint specs/my-wts-bff-openapi.yaml",
+    );
   });
 });
