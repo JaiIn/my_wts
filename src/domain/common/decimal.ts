@@ -1,6 +1,8 @@
 import Decimal from "decimal.js";
 import { z } from "zod";
 
+const ContractDecimal = Decimal.clone({ precision: 40 });
+
 const DECIMAL_STRING_PATTERN =
   /^[+-]?(?:\d+(?:\.\d+)?|\.\d+)(?:[eE][+-]?\d+)?$/;
 
@@ -24,5 +26,5 @@ export function decodeDecimalString(input: unknown): DecimalString {
 }
 
 export function decimalFromString(value: DecimalString): Decimal {
-  return new Decimal(value);
+  return new ContractDecimal(value);
 }

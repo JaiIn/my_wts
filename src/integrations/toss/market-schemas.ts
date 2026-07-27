@@ -1,0 +1,50 @@
+import { z } from "zod";
+
+import { decimalStringSchema } from "../../domain/common/decimal";
+
+export const tossSymbolSchema = z
+  .string()
+  .min(1)
+  .max(32)
+  .regex(/^[A-Za-z0-9._-]+$/);
+
+const forwardCompatibleEnumSchema = z.string().min(1);
+const optionalDateSchema = z.iso.date().nullable().optional();
+const optionalDecimalSchema = decimalStringSchema.nullable().optional();
+
+const koreanMarketDetailSchema = z.looseObject({
+  liquidationTrading: z.boolean(),
+  nxtSupported: z.boolean(),
+  krxTradingSuspended: z.boolean(),
+  nxtTradingSuspended: z.boolean().nullable().optional(),
+});
+
+export const tossStockInfoSchema = z.looseObject({
+  symbol: tossSymbolSchema,
+  name: z.string(),
+  englishName: z.string(),
+  isinCode: z.string(),
+  market: forwardCompatibleEnumSchema,
+  securityType: forwardCompatibleEnumSchema,
+  isCommonShare: z.boolean(),
+  status: forwardCompatibleEnumSchema,
+  currency: forwardCompatibleEnumSchema,
+  listDate: optionalDateSchema,
+  delistDate: optionalDateSchema,
+  sharesOutstanding: decimalStringSchema,
+  leverageFactor: optionalDecimalSchema,
+  koreanMarketDetail: koreanMarketDetailSchema.nullable().optional(),
+});
+
+export const tossPriceResponseSchema = z.looseObject({
+  symbol: tossSymbolSchema,
+  timestamp: z.iso.datetime({ offset: true }).nullable().optional(),
+  lastPrice: decimalStringSchema,
+  currency: forwardCompatibleEnumSchema,
+});
+
+export const tossStockInfoListSchema = z.array(tossStockInfoSchema);
+export const tossPriceResponseListSchema = z.array(tossPriceResponseSchema);
+
+export type TossStockInfo = z.infer<typeof tossStockInfoSchema>;
+export type TossPriceResponse = z.infer<typeof tossPriceResponseSchema>;
