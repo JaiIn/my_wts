@@ -18,6 +18,9 @@
     "test:safety": "vitest run tests/safety",
     "test:e2e": "playwright test",
     "check:stage": "node scripts/check-stage.mjs",
+    "db:generate": "drizzle-kit generate",
+    "db:migrate": "drizzle-kit migrate",
+    "db:studio": "drizzle-kit studio",
     "spec:check": "redocly lint specs/my-wts-bff-openapi.yaml"
   },
   "dependencies": {
