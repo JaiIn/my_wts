@@ -1,24 +1,33 @@
 import {
   MarketDataNotFoundError,
+  MarketDataSourceError,
   type MarketService,
 } from "../../application/market/market-service";
-import type { MarketPrice, MarketStock } from "../../domain/market/market";
+import type {
+  MarketPrice,
+  MarketStock,
+  MarketWarning,
+} from "../../domain/market/market";
 import { decodeTossEnvelope } from "../../integrations/toss/envelope";
 import {
   tossPriceResponseListSchema,
   tossStockInfoListSchema,
+  tossStockWarningListSchema,
   type TossPriceResponse,
   type TossStockInfo,
+  type TossStockWarning,
 } from "../../integrations/toss/market-schemas";
 import {
   MOCK_PRICES_TOSS_ENVELOPE,
   MOCK_STOCKS_TOSS_ENVELOPE,
+  MOCK_WARNINGS_TOSS_ENVELOPES,
 } from "./mock-market-fixtures";
 import type { z } from "zod";
 
 export type MockMarketFixtureSet = {
   stocksEnvelope: unknown;
   pricesEnvelope: unknown;
+  warningsEnvelopes?: Readonly<Record<string, unknown>>;
 };
 
 function compareSymbols(left: string, right: string): number {
@@ -65,6 +74,37 @@ function toMarketPrice(price: TossPriceResponse): MarketPrice {
   };
 }
 
+function toMarketWarning(warning: TossStockWarning): MarketWarning {
+  return {
+    warningType: warning.warningType,
+    exchange: warning.exchange,
+    startDate: warning.startDate,
+    endDate: warning.endDate,
+  };
+}
+
+function compareWarning(left: MarketWarning, right: MarketWarning): number {
+  const leftDate = left.startDate ?? "";
+  const rightDate = right.startDate ?? "";
+  if (leftDate !== rightDate) {
+    return leftDate > rightDate ? -1 : 1;
+  }
+  return compareSymbols(left.warningType, right.warningType);
+}
+
+function warningSourceError(code: string): MarketDataSourceError {
+  if (code === "rate-limit-exceeded") {
+    return new MarketDataSourceError("UPSTREAM_RATE_LIMITED", true);
+  }
+  if (code === "timeout") {
+    return new MarketDataSourceError("UPSTREAM_TIMEOUT", true);
+  }
+  if (code === "internal-error" || code === "maintenance") {
+    return new MarketDataSourceError("UPSTREAM_UNAVAILABLE", true);
+  }
+  return new MarketDataSourceError("UPSTREAM_UNKNOWN_ERROR", false);
+}
+
 function decodeFixture<T>(envelope: unknown, schema: z.ZodType<T[]>): T[] {
   const decoded = decodeTossEnvelope(envelope, schema);
   if (!decoded.ok) {
@@ -89,6 +129,8 @@ export function createMockMarketService(
     fixtures.pricesEnvelope,
     tossPriceResponseListSchema,
   ).map(toMarketPrice);
+  const warningsEnvelopes: Readonly<Record<string, unknown>> =
+    fixtures.warningsEnvelopes ?? MOCK_WARNINGS_TOSS_ENVELOPES;
 
   const stocksBySymbol = new Map(stocks.map((stock) => [stock.symbol, stock]));
   const pricesBySymbol = new Map(prices.map((price) => [price.symbol, price]));
@@ -112,6 +154,33 @@ export function createMockMarketService(
         throw new MarketDataNotFoundError();
       }
       return structuredClone(price);
+    },
+
+    async getWarnings(symbol) {
+      if (!stocksBySymbol.has(symbol)) {
+        throw new MarketDataNotFoundError();
+      }
+      const envelope = warningsEnvelopes[symbol];
+      if (envelope === undefined) {
+        throw new MarketDataNotFoundError();
+      }
+      const decoded = decodeTossEnvelope(envelope, tossStockWarningListSchema);
+      if (!decoded.ok) {
+        throw warningSourceError(decoded.error.code);
+      }
+
+      const seen = new Set<string>();
+      return decoded.result
+        .map(toMarketWarning)
+        .sort(compareWarning)
+        .filter(({ warningType }) => {
+          if (seen.has(warningType)) {
+            return false;
+          }
+          seen.add(warningType);
+          return true;
+        })
+        .map((warning) => structuredClone(warning));
     },
   };
 }

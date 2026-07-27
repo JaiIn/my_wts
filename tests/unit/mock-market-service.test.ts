@@ -28,8 +28,8 @@ describe("mock market fixtures and service", () => {
       tossPriceResponseListSchema,
     );
 
-    expect(stocks.ok && stocks.result).toHaveLength(3);
-    expect(prices.ok && prices.result).toHaveLength(3);
+    expect(stocks.ok && stocks.result).toHaveLength(5);
+    expect(prices.ok && prices.result).toHaveLength(4);
   });
 
   it("preserves KR, US, and unknown enum values at the DTO boundary", () => {
@@ -40,11 +40,9 @@ describe("mock market fixtures and service", () => {
     expect(decoded.ok).toBe(true);
     if (!decoded.ok) return;
 
-    expect(decoded.result.map(({ market }) => market)).toEqual([
-      "KOSPI",
-      "NASDAQ",
-      "FUTURE_MARKET",
-    ]);
+    expect(new Set(decoded.result.map(({ market }) => market))).toEqual(
+      new Set(["KOSPI", "NASDAQ", "FUTURE_MARKET"]),
+    );
   });
 
   it("returns deterministic symbol ordering and representative lookups", async () => {
@@ -55,7 +53,7 @@ describe("mock market fixtures and service", () => {
     );
     await expect(
       service.listStocks().then((stocks) => stocks.map(({ symbol }) => symbol)),
-    ).resolves.toEqual(["005930", "AAPL", "FWD1"]);
+    ).resolves.toEqual(["005930", "AAPL", "EMPTY1", "ERR1", "FWD1"]);
     await expect(service.getStock("005930")).resolves.toMatchObject({
       symbol: "005930",
       market: "KOSPI",
@@ -139,7 +137,52 @@ describe("mock market fixtures and service", () => {
     await service.listStocks();
     await service.getStock("AAPL");
     await service.getPrice("AAPL");
+    await service.getWarnings("AAPL");
 
     expect(fetchSpy).not.toHaveBeenCalled();
+  });
+
+  it("returns warnings in deterministic order and removes duplicate codes", async () => {
+    const service = createMockMarketService();
+
+    await expect(service.getWarnings("005930")).resolves.toMatchObject([
+      { warningType: "VI_STATIC", startDate: "2025-01-02" },
+      { warningType: "OVERHEATED", startDate: "2025-01-01" },
+    ]);
+    await expect(service.getWarnings("FWD1")).resolves.toMatchObject([
+      { warningType: "FUTURE_WARNING" },
+      { warningType: "INVESTMENT_RISK" },
+    ]);
+  });
+
+  it("isolates warning fixture data from caller mutation", async () => {
+    const service = createMockMarketService();
+    const first = await service.getWarnings("005930");
+
+    first[0]!.warningType = "mutated";
+
+    expect((await service.getWarnings("005930"))[0]?.warningType).toBe(
+      "VI_STATIC",
+    );
+  });
+
+  it("maps a mock warning envelope error without exposing upstream content", async () => {
+    const service = createMockMarketService();
+    let thrown: unknown;
+
+    try {
+      await service.getWarnings("ERR1");
+    } catch (error) {
+      thrown = error;
+    }
+
+    expect(thrown).toMatchObject({
+      name: "MarketDataSourceError",
+      message: "MARKET_DATA_SOURCE_ERROR",
+      code: "UPSTREAM_UNAVAILABLE",
+      retryable: true,
+    });
+    expect(String(thrown)).not.toContain("Mock warning lookup failed.");
+    expect(String(thrown)).not.toContain("mock-warning-request");
   });
 });

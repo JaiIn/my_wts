@@ -29,6 +29,19 @@ describe("market screen server-to-client contract", () => {
     expect(data.prices.find(({ symbol }) => symbol === "FWD1")?.lastPrice).toBe(
       "9007199254740993.123456789",
     );
+    expect(
+      data.warnings.find(({ symbol }) => symbol === "005930")?.warnings,
+    ).toMatchObject([
+      { title: "정적 변동성 완화장치 발동" },
+      { title: "단기과열종목" },
+    ]);
+    expect(data.prices.some(({ symbol }) => symbol === "EMPTY1")).toBe(false);
+    expect(data.priceErrors.some(({ symbol }) => symbol === "EMPTY1")).toBe(
+      false,
+    );
+    expect(
+      data.warningErrors.find(({ symbol }) => symbol === "ERR1")?.error.kind,
+    ).toBe("unavailable");
   });
 
   it("does not expose persistence or authentication internals", async () => {
@@ -41,5 +54,8 @@ describe("market screen server-to-client contract", () => {
     expect(serialized).not.toContain("accountSeq");
     expect(serialized).not.toContain("isinCode");
     expect(serialized).not.toContain("sharesOutstanding");
+    expect(serialized).not.toContain("VI_STATIC");
+    expect(serialized).not.toContain("internal-error");
+    expect(serialized).not.toContain("mock-warning-request");
   });
 });

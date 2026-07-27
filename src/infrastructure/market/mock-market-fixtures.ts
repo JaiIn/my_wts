@@ -67,6 +67,38 @@ export const MOCK_STOCKS_TOSS_ENVELOPE = deepFreeze({
       leverageFactor: "1.25",
       koreanMarketDetail: null,
     },
+    {
+      symbol: "EMPTY1",
+      name: "가격 미제공 테스트",
+      englishName: "NO PRICE TEST",
+      isinCode: "ZZ0000000002",
+      market: "FUTURE_MARKET",
+      securityType: "FUTURE_SECURITY_TYPE",
+      isCommonShare: false,
+      status: "FUTURE_STATUS",
+      currency: "XTS",
+      listDate: null,
+      delistDate: null,
+      sharesOutstanding: "1000",
+      leverageFactor: null,
+      koreanMarketDetail: null,
+    },
+    {
+      symbol: "ERR1",
+      name: "경고 오류 테스트",
+      englishName: "WARNING ERROR TEST",
+      isinCode: "ZZ0000000003",
+      market: "FUTURE_MARKET",
+      securityType: "FUTURE_SECURITY_TYPE",
+      isCommonShare: false,
+      status: "FUTURE_STATUS",
+      currency: "XTS",
+      listDate: null,
+      delistDate: null,
+      sharesOutstanding: "2000",
+      leverageFactor: null,
+      koreanMarketDetail: null,
+    },
   ],
 });
 
@@ -90,5 +122,62 @@ export const MOCK_PRICES_TOSS_ENVELOPE = deepFreeze({
       lastPrice: "9007199254740993.123456789",
       currency: "XTS",
     },
+    {
+      symbol: "ERR1",
+      timestamp: "2025-01-02T12:00:00.000+09:00",
+      lastPrice: "123.45",
+      currency: "XTS",
+    },
   ],
+});
+
+export const MOCK_WARNINGS_TOSS_ENVELOPES = deepFreeze({
+  "005930": {
+    result: [
+      {
+        warningType: "VI_STATIC",
+        exchange: "KRX",
+        startDate: "2025-01-02",
+        endDate: null,
+      },
+      {
+        warningType: "OVERHEATED",
+        exchange: "KRX",
+        startDate: "2025-01-01",
+        endDate: "2025-01-31",
+      },
+    ],
+  },
+  AAPL: { result: [] },
+  FWD1: {
+    result: [
+      {
+        warningType: "FUTURE_WARNING",
+        exchange: null,
+        startDate: "2025-01-03",
+        endDate: null,
+      },
+      {
+        warningType: "INVESTMENT_RISK",
+        exchange: null,
+        startDate: "2025-01-02",
+        endDate: null,
+      },
+      {
+        warningType: "FUTURE_WARNING",
+        exchange: null,
+        startDate: "2025-01-01",
+        endDate: null,
+      },
+    ],
+  },
+  EMPTY1: { result: [] },
+  ERR1: {
+    error: {
+      requestId: "mock-warning-request",
+      code: "internal-error",
+      message: "Mock warning lookup failed.",
+      data: {},
+    },
+  },
 });

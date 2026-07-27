@@ -43,8 +43,17 @@ export const tossPriceResponseSchema = z.looseObject({
   currency: forwardCompatibleEnumSchema,
 });
 
+export const tossStockWarningSchema = z.looseObject({
+  warningType: forwardCompatibleEnumSchema,
+  exchange: z.string().nullable().optional(),
+  startDate: optionalDateSchema,
+  endDate: optionalDateSchema,
+});
+
 export const tossStockInfoListSchema = z.array(tossStockInfoSchema);
 export const tossPriceResponseListSchema = z.array(tossPriceResponseSchema);
+export const tossStockWarningListSchema = z.array(tossStockWarningSchema);
 
 export type TossStockInfo = z.infer<typeof tossStockInfoSchema>;
 export type TossPriceResponse = z.infer<typeof tossPriceResponseSchema>;
+export type TossStockWarning = z.infer<typeof tossStockWarningSchema>;

@@ -10,6 +10,7 @@ import {
 import { afterEach, describe, expect, it } from "vitest";
 
 import MarketPage from "../../app/(dashboard)/market/page";
+import { MarketScreen } from "../../src/ui/market/market-screen";
 
 afterEach(() => {
   cleanup();
@@ -27,6 +28,8 @@ describe("market screen", () => {
     expect(screen.getByText("005930 · KOSPI")).toBeTruthy();
     expect(screen.getByTestId("last-price").textContent).toBe("72,000 KRW");
     expect(screen.getByText("실시간 시세 아님")).toBeTruthy();
+    expect(screen.getByRole("heading", { name: "종목 유의사항" })).toBeTruthy();
+    expect(screen.getByText("정적 변동성 완화장치 발동")).toBeTruthy();
   });
 
   it("supports accessible symbol search and keyboard selection", async () => {
@@ -46,6 +49,7 @@ describe("market screen", () => {
 
     expect(screen.getByText("AAPL · NASDAQ")).toBeTruthy();
     expect(screen.getByTestId("last-price").textContent).toBe("185.70 USD");
+    expect(screen.queryByRole("heading", { name: "종목 유의사항" })).toBeNull();
   });
 
   it("searches Korean names after trimming whitespace", async () => {
@@ -73,17 +77,25 @@ describe("market screen", () => {
 
   it("shows only the minimal no-result state and no unsupported quote fields", async () => {
     await renderMarketPage();
-    fireEvent.change(screen.getByRole("combobox"), {
+    const search = screen.getByRole("combobox");
+    fireEvent.change(search, {
       target: { value: "missing" },
     });
 
     expect(screen.getByRole("status").textContent).toBe(
-      "일치하는 종목이 없습니다.",
+      "일치하는 종목이 없습니다. 다른 검색어를 입력해 주세요.",
     );
+    expect(screen.queryByTestId("last-price")).toBeNull();
+    expect(screen.queryByRole("heading", { name: "종목 유의사항" })).toBeNull();
     expect(screen.queryByText("등락")).toBeNull();
     expect(screen.queryByText("등락률")).toBeNull();
     expect(screen.queryByText("거래량")).toBeNull();
     expect(screen.queryByRole("button")).toBeNull();
+
+    fireEvent.change(search, { target: { value: "aapl" } });
+    fireEvent.click(screen.getByRole("option"));
+    expect(screen.getByTestId("last-price").textContent).toBe("185.70 USD");
+    expect(screen.queryByRole("status")).toBeNull();
   });
 
   it("does not render authentication or database internals into the client view", async () => {
@@ -94,5 +106,85 @@ describe("market screen", () => {
     expect(html).not.toContain("passwordHash");
     expect(html).not.toContain("sessionTokenHash");
     expect(html).not.toContain("accountSeq");
+  });
+
+  it("shows the minimum-length status without stale price or warnings", async () => {
+    await renderMarketPage();
+    fireEvent.change(screen.getByRole("combobox"), {
+      target: { value: "a" },
+    });
+
+    expect(screen.getByRole("status").textContent).toBe(
+      "검색하려면 2자 이상 입력해 주세요.",
+    );
+    expect(screen.queryByTestId("last-price")).toBeNull();
+    expect(screen.queryByText("단기과열종목")).toBeNull();
+  });
+
+  it("shows unknown warnings safely and removes stale warnings across selection", async () => {
+    await renderMarketPage();
+    const search = screen.getByRole("combobox");
+
+    fireEvent.change(search, { target: { value: "fwd1" } });
+    fireEvent.click(screen.getByRole("option"));
+
+    expect(screen.getByText("종목 유의사항", { selector: "h3" })).toBeTruthy();
+    expect(
+      screen.getByText("확인되지 않은 유형의 종목 유의사항이 있습니다."),
+    ).toBeTruthy();
+    expect(screen.queryByText("FUTURE_WARNING")).toBeNull();
+    expect(screen.queryByText("단기과열종목")).toBeNull();
+
+    fireEvent.change(search, { target: { value: "aapl" } });
+    fireEvent.click(screen.getByRole("option"));
+    expect(screen.queryByRole("heading", { name: "종목 유의사항" })).toBeNull();
+  });
+
+  it("shows missing-price and safe warning-error states without stale data", async () => {
+    await renderMarketPage();
+    const search = screen.getByRole("combobox");
+
+    fireEvent.change(search, { target: { value: "empty1" } });
+    fireEvent.click(screen.getByRole("option"));
+    expect(screen.getByRole("status").textContent).toContain(
+      "현재가가 없습니다.",
+    );
+    expect(screen.queryByTestId("last-price")).toBeNull();
+
+    fireEvent.change(search, { target: { value: "err1" } });
+    fireEvent.click(screen.getByRole("option"));
+    expect(screen.getByRole("alert").textContent).toContain(
+      "종목 유의사항을 불러오지 못했습니다.",
+    );
+    expect(screen.getByTestId("last-price").textContent).toBe("123.45 XTS");
+    expect(document.body.textContent).not.toContain("internal-error");
+    expect(document.body.textContent).not.toContain("mock-warning-request");
+    expect(document.body.textContent).not.toContain(
+      "Mock warning lookup failed.",
+    );
+
+    fireEvent.change(search, { target: { value: "aapl" } });
+    fireEvent.click(screen.getByRole("option"));
+    expect(screen.queryByRole("alert")).toBeNull();
+    expect(screen.getByTestId("last-price").textContent).toBe("185.70 USD");
+  });
+
+  it("renders the empty stock-list state without search or stale cards", () => {
+    render(
+      <MarketScreen
+        initialSymbol=""
+        stocks={[]}
+        prices={[]}
+        warnings={[]}
+        priceErrors={[]}
+        warningErrors={[]}
+      />,
+    );
+
+    expect(screen.getByRole("status").textContent).toContain(
+      "표시할 종목이 없습니다.",
+    );
+    expect(screen.queryByRole("combobox")).toBeNull();
+    expect(screen.queryByTestId("last-price")).toBeNull();
   });
 });
