@@ -16,8 +16,11 @@
     "test:component": "vitest run tests/component",
     "test:integration": "vitest run tests/integration",
     "test:safety": "vitest run tests/safety",
-    "test:e2e": "playwright test",
+    "test:e2e": "node scripts/run-e2e.mjs",
     "check:stage": "node scripts/check-stage.mjs",
+    "db:generate": "drizzle-kit generate",
+    "db:migrate": "drizzle-kit migrate",
+    "db:studio": "drizzle-kit studio",
     "spec:check": "redocly lint specs/my-wts-bff-openapi.yaml"
   },
   "dependencies": {
