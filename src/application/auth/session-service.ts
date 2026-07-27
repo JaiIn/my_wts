@@ -1,0 +1,113 @@
+import { createHash } from "node:crypto";
+
+const SESSION_TOKEN_BYTES = 32;
+const SESSION_IDLE_LIFETIME_MS = 12 * 60 * 60 * 1_000;
+
+export type SessionRecordForAuthentication = {
+  userId: string;
+  lastSeenAt: string;
+  expiresAt: string;
+};
+
+export type SessionUser = {
+  id: string;
+  username: string;
+  displayName: string;
+};
+
+export interface SessionPersistence {
+  findSessionByTokenHash(
+    tokenHash: string,
+  ): SessionRecordForAuthentication | undefined;
+  findUserById(userId: string): SessionUser | undefined;
+}
+
+export type SessionAuthenticationFailureCode =
+  "AUTH_REQUIRED" | "SESSION_EXPIRED";
+
+export class SessionAuthenticationError extends Error {
+  constructor(readonly code: SessionAuthenticationFailureCode) {
+    super(code);
+    this.name = "SessionAuthenticationError";
+  }
+}
+
+export class SessionPersistenceError extends Error {
+  constructor() {
+    super("DATABASE_ERROR");
+    this.name = "SessionPersistenceError";
+  }
+}
+
+type SessionServiceOptions = {
+  now?: () => Date;
+};
+
+function parseSessionToken(token: unknown): string | undefined {
+  if (typeof token !== "string" || !/^[A-Za-z0-9_-]+$/.test(token)) {
+    return undefined;
+  }
+
+  const decoded = Buffer.from(token, "base64url");
+  if (
+    decoded.length !== SESSION_TOKEN_BYTES ||
+    decoded.toString("base64url") !== token
+  ) {
+    return undefined;
+  }
+
+  return token;
+}
+
+function hashSessionToken(token: string): string {
+  return createHash("sha256").update(token).digest("hex");
+}
+
+function parseStoredDate(value: string): number | undefined {
+  const timestamp = Date.parse(value);
+  return Number.isFinite(timestamp) ? timestamp : undefined;
+}
+
+export class SessionService {
+  private readonly now: () => Date;
+
+  constructor(
+    private readonly persistence: SessionPersistence,
+    options: SessionServiceOptions = {},
+  ) {
+    this.now = options.now ?? (() => new Date());
+  }
+
+  authenticate(token: unknown): SessionUser {
+    const parsedToken = parseSessionToken(token);
+    if (!parsedToken) {
+      throw new SessionAuthenticationError("AUTH_REQUIRED");
+    }
+
+    const session = this.persistence.findSessionByTokenHash(
+      hashSessionToken(parsedToken),
+    );
+    if (!session) {
+      throw new SessionAuthenticationError("AUTH_REQUIRED");
+    }
+
+    const now = this.now().getTime();
+    const absoluteExpiry = parseStoredDate(session.expiresAt);
+    const lastSeenAt = parseStoredDate(session.lastSeenAt);
+    if (
+      absoluteExpiry === undefined ||
+      lastSeenAt === undefined ||
+      now >= absoluteExpiry ||
+      now - lastSeenAt >= SESSION_IDLE_LIFETIME_MS
+    ) {
+      throw new SessionAuthenticationError("SESSION_EXPIRED");
+    }
+
+    const user = this.persistence.findUserById(session.userId);
+    if (!user) {
+      throw new SessionAuthenticationError("AUTH_REQUIRED");
+    }
+
+    return user;
+  }
+}
