@@ -14,7 +14,7 @@ Repository state on 2026-07-24: empty, no first commit
 
 ## 0. 결론
 
-확정 기술 스택은 **Next.js 16 App Router + React 19 + TypeScript 7 + Node.js 24 LTS**이다. 자세한 결정은 [docs/14_TECH_STACK_DECISION.md](docs/14_TECH_STACK_DECISION.md)를 따른다.
+확정 기술 스택은 **Next.js 16 App Router + React 19 + TypeScript 5.9 + Node.js 24 LTS**이다. 자세한 결정은 [docs/14_TECH_STACK_DECISION.md](docs/14_TECH_STACK_DECISION.md)를 따른다.
 
 - 브라우저는 토스증권 API를 직접 호출하지 않는다.
 - `client_secret`, access token, `accountSeq`는 Next.js 서버 런타임에만 둔다.
@@ -101,13 +101,13 @@ Git: one functional stage = one commit; commit+push use one approval
 Merge: milestone boundary only, not every stage
 Tests: affected fast tests per stage; full suite per milestone
 Environment: create .env.example and ignored .env.local immediately after skeleton
-Stack: Next.js 16 / React 19 / TypeScript 7 / Node 24 LTS / pnpm 11
+Stack: Next.js 16 / React 19 / TypeScript 5.9 / Node 24 LTS / pnpm 11
 Documentation: frozen during implementation; completion reports are chat-only
 ```
 
 ## 4.1 문서 동결
 
-이 package는 `my_wts Documentation Baseline v1.1`이다. 개발 시작 후 README, CODEX, docs, references, specs, templates는 수정하거나 추가하지 않는다. 예측 불가능한 공식 API 변경·보안 취약점·내부 모순이 발견되면 구현을 중단하고 사용자의 `문서 변경 승인`을 요청한다.
+이 package는 `my_wts Documentation Baseline v1.2`이다. 개발 시작 후 README, CODEX, docs, references, specs, templates는 수정하거나 추가하지 않는다. 예측 불가능한 공식 API 변경·보안 취약점·내부 모순이 발견되면 구현을 중단하고 사용자의 `문서 변경 승인`을 요청한다.
 
 ## 5. 공식 출처
 

@@ -2,7 +2,7 @@
 
 상태: `FROZEN`  
 동결 기준일: 2026-07-24  
-Baseline: `my_wts Documentation Baseline v1.1`
+Baseline: `my_wts Documentation Baseline v1.2`
 
 ## 1. 목적
 

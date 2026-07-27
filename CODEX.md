@@ -9,7 +9,7 @@
 프로젝트명: my_wts
 GitHub: https://github.com/JaiIn/my_wts
 로컬 경로: C:\Users\admin\Desktop\my_wts
-확정 framework: Next.js 16 App Router + React 19 + TypeScript 7
+확정 framework: Next.js 16 App Router + React 19 + TypeScript 5.9
 확정 runtime: Node.js 24 LTS
 확정 package manager: pnpm 11
 Backend: Next.js Route Handlers, Node runtime

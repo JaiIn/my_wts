@@ -37,7 +37,7 @@ Node 26은 2026-07-24 현재 Current이므로 사용하지 않고 Node 24 LTS를
 |---|---|---:|
 | Framework | Next.js App Router | 16.2.x |
 | View | React | 19.2.x |
-| Language | TypeScript strict | 7.0.x |
+| Language | TypeScript strict | 5.9.x |
 | Styling | Tailwind CSS | 4.3.x |
 | UI components | shadcn/ui 고정 component set | CLI 4.14.x |
 | Accessible primitives | shadcn이 생성하는 Radix 계열 | lockfile 고정 |
@@ -151,7 +151,7 @@ DB는 M01 로컬 인증에서 도입한다.
 | Component | React Testing Library | 16.3.x |
 | API mock | MSW | 2.15.x |
 | Browser E2E | Playwright | 1.61.x |
-| Lint | ESLint | 10.7.x |
+| Lint | ESLint | 9.39.x |
 | Format | Prettier | 3.9.x |
 
 Jest, Cypress, Storybook은 사용하지 않는다. 필요성이 확인되면 별도 ADR로만 추가한다.
@@ -189,7 +189,7 @@ Jest, Cypress, Storybook은 사용하지 않는다. 필요성이 확인되면 �
 ```text
 next 16.2.11
 react 19.2.8
-typescript 7.0.2
+typescript 5.9.3
 pnpm 11.17.0
 ```
 
@@ -272,11 +272,11 @@ sonner 2.0.7
 ### devDependencies
 
 ```text
-typescript 7.0.2
+typescript 5.9.3
 @types/node 24.13.3
 @types/react 19.2.17
 @types/react-dom 19.2.3
-eslint 10.7.0
+eslint 9.39.5
 eslint-config-next 16.2.11
 prettier 3.9.6
 openapi-typescript 7.13.0

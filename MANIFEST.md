@@ -2,7 +2,7 @@
 
 Package: `my_wts-development-guide`  
 Generated: 2026-07-24  
-Revision: 5 (local authentication + read-only/no-order baseline)  
+Revision: 6 (compatible dependency baseline + local authentication + read-only/no-order baseline)  
 Official API snapshot: Toss OpenAPI `1.2.4`
 
 ## Documents
@@ -76,7 +76,7 @@ Official API snapshot: Toss OpenAPI `1.2.4`
 - GitHub stage commit workflow for `JaiIn/my_wts`
 - Environment-first `.env.example` / ignored `.env.local` workflow
 - Role-based guides for coordinator, environment, frontend, API, market, account, orders, tests, Git, and docs
-- Accepted ADR for Next.js 16, React 19, TypeScript 7, Node 24 LTS, pnpm 11, SQLite/Drizzle, and the test stack
+- Accepted ADR for Next.js 16, React 19, TypeScript 5.9, Node 24 LTS, pnpm 11, SQLite/Drizzle, and the test stack
 - Frozen product, screen, BFF, database, error, logging, configuration, command, and acceptance contracts
 - Development-time documentation write ban with explicit change-control exceptions
 - Official Markdown and canonical OpenAPI JSON snapshots

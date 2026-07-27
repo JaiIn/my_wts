@@ -28,7 +28,7 @@ Browser (React UI)
 ## 3. 확정 기술
 
 - Next.js 16 App Router
-- React 19 + TypeScript 7 strict
+- React 19 + TypeScript 5.9 strict
 - Node.js 24 LTS + pnpm 11
 - runtime validation: Zod
 - decimal arithmetic: decimal.js
