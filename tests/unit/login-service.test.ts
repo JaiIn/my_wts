@@ -7,6 +7,7 @@ import {
   LoginService,
   LoginValidationError,
 } from "../../src/application/auth/login-service";
+import { LoginRateLimitedError } from "../../src/application/auth/login-attempt-limiter";
 import { hashPassword } from "../../src/domain/auth/password";
 
 const NOW = new Date("2026-07-27T00:00:00.000Z");
@@ -98,5 +99,37 @@ describe("LoginService", () => {
       }),
     ).rejects.toBeInstanceOf(LoginValidationError);
     expect(lookedUpUsername).toBeUndefined();
+  });
+
+  it("clears prior failures only after a successful login", async () => {
+    const service = new LoginService(persistence);
+
+    await expect(
+      service.login({
+        username: "local.user",
+        password: "y".repeat(10),
+      }),
+    ).rejects.toBeInstanceOf(InvalidCredentialsError);
+    await expect(
+      service.login({
+        username: "local.user",
+        password: "x".repeat(10),
+      }),
+    ).resolves.toBeDefined();
+
+    for (let attempt = 0; attempt < 5; attempt += 1) {
+      await expect(
+        service.login({
+          username: "local.user",
+          password: "y".repeat(10),
+        }),
+      ).rejects.toBeInstanceOf(InvalidCredentialsError);
+    }
+    await expect(
+      service.login({
+        username: "local.user",
+        password: "x".repeat(10),
+      }),
+    ).rejects.toBeInstanceOf(LoginRateLimitedError);
   });
 });

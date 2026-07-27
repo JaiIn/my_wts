@@ -100,6 +100,19 @@ describe("GET /api/v1/auth/session", () => {
     expect(JSON.stringify(body)).not.toMatch(
       /password|token|hash|salt|stack|sqlite/i,
     );
+
+    const storedSession = database.$client
+      .prepare(
+        "SELECT last_seen_at, expires_at FROM sessions WHERE user_id = ?",
+      )
+      .get("usr_session_test") as {
+      last_seen_at: string;
+      expires_at: string;
+    };
+    expect(storedSession).toEqual({
+      last_seen_at: "2026-07-27T13:00:00.000Z",
+      expires_at: "2026-08-03T12:00:00.000Z",
+    });
   });
 
   it("returns AUTH_REQUIRED for missing, nonexistent, and modified tokens", async () => {

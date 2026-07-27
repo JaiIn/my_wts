@@ -194,6 +194,62 @@ describe("POST /api/v1/auth/login", () => {
     expect((await foreignOrigin.json()).error.code).toBe("FORBIDDEN");
   });
 
+  it("rate-limits after five failures and resets at the frozen boundary", async () => {
+    let currentTime = NOW;
+    const limitedService = new LoginService(
+      new SqliteLoginPersistence(database),
+      {
+        now: () => currentTime,
+        createId: () => "rate-limit-session",
+        createToken: () => "rate-limit-session-value",
+      },
+    );
+    const handler = createLoginHandler(limitedService, () => REQUEST_ID);
+
+    for (let attempt = 0; attempt < 5; attempt += 1) {
+      const response = await handler(
+        loginRequest({
+          username: "LOCAL.USER",
+          password: "y".repeat(10),
+        }),
+      );
+      expect(response.status).toBe(401);
+      expect((await response.json()).error.code).toBe("INVALID_CREDENTIALS");
+    }
+
+    const limited = await handler(
+      loginRequest({
+        username: "local.user",
+        password: "x".repeat(10),
+      }),
+    );
+    const limitedBody = await limited.json();
+    expect(limited.status).toBe(429);
+    expect(limited.headers.get("retry-after")).toBe("900");
+    expect(limitedBody.error).toEqual({
+      requestId: REQUEST_ID,
+      code: "AUTH_RATE_LIMITED",
+      message: "로그인 시도가 너무 많습니다. 잠시 후 다시 시도해 주세요.",
+      retryable: true,
+      details: {},
+    });
+    expect(JSON.stringify(limitedBody)).not.toMatch(
+      /password|hash|counter|sqlite|stack/i,
+    );
+
+    currentTime = new Date("2026-07-27T00:15:00.000Z");
+    expect(
+      (
+        await handler(
+          loginRequest({
+            username: "local.user",
+            password: "x".repeat(10),
+          }),
+        )
+      ).status,
+    ).toBe(204);
+  });
+
   it("returns a safe database error without logging request data", async () => {
     const consoleError = vi
       .spyOn(console, "error")

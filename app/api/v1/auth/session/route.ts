@@ -7,7 +7,7 @@ import {
   SessionPersistenceError,
   type SessionUser,
 } from "../../../../../src/application/auth/session-service";
-import { getRuntimeSessionService } from "../../../../../src/infrastructure/auth/runtime-session-service";
+import { authenticateRuntimeSession } from "../../../../../src/infrastructure/auth/runtime-session-service";
 
 const SESSION_COOKIE_NAME = "my_wts_session";
 const LOOPBACK_HOST = "127.0.0.1:3000";
@@ -115,5 +115,5 @@ export function createSessionHandler(
 }
 
 export const GET = createSessionHandler({
-  authenticate: (token) => getRuntimeSessionService().authenticate(token),
+  authenticate: authenticateRuntimeSession,
 });

@@ -161,3 +161,6 @@ export type UserRecord = typeof users.$inferSelect;
 export type NewUserRecord = typeof users.$inferInsert;
 export type SessionRecord = typeof sessions.$inferSelect;
 export type NewSessionRecord = typeof sessions.$inferInsert;
+export type AppSettingRecord = typeof appSettings.$inferSelect;
+export type WatchlistRecord = typeof watchlists.$inferSelect;
+export type WatchlistItemRecord = typeof watchlistItems.$inferSelect;

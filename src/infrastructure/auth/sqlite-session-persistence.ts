@@ -44,4 +44,15 @@ export class SqliteSessionPersistence implements SessionPersistence {
       throw new SessionPersistenceError();
     }
   }
+
+  updateLastSeenAt(tokenHash: string, lastSeenAt: string): void {
+    try {
+      new SessionRepository(this.database).updateLastSeenAt(
+        tokenHash,
+        lastSeenAt,
+      );
+    } catch {
+      throw new SessionPersistenceError();
+    }
+  }
 }

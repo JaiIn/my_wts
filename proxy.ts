@@ -5,7 +5,7 @@ import {
   safeProtectedDestination,
 } from "./src/application/auth/protected-routes";
 import type { SessionUser } from "./src/application/auth/session-service";
-import { getRuntimeSessionService } from "./src/infrastructure/auth/runtime-session-service";
+import { authenticateRuntimeSession } from "./src/infrastructure/auth/runtime-session-service";
 
 const SESSION_COOKIE_NAME = "my_wts_session";
 const LOOPBACK_ORIGIN = "http://127.0.0.1:3000";
@@ -51,7 +51,7 @@ export function createAuthProxy(service: SessionServiceContract) {
 }
 
 export const proxy = createAuthProxy({
-  authenticate: (token) => getRuntimeSessionService().authenticate(token),
+  authenticate: authenticateRuntimeSession,
 });
 
 export const config = {

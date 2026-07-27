@@ -1,6 +1,7 @@
 import { hashCanonicalSessionToken } from "../../domain/auth/session-token";
 
 const SESSION_IDLE_LIFETIME_MS = 12 * 60 * 60 * 1_000;
+const SESSION_LAST_SEEN_UPDATE_INTERVAL_MS = 15 * 60 * 1_000;
 
 export type SessionRecordForAuthentication = {
   userId: string;
@@ -19,6 +20,7 @@ export interface SessionPersistence {
     tokenHash: string,
   ): SessionRecordForAuthentication | undefined;
   findUserById(userId: string): SessionUser | undefined;
+  updateLastSeenAt(tokenHash: string, lastSeenAt: string): void;
 }
 
 export type SessionAuthenticationFailureCode =
@@ -83,6 +85,10 @@ export class SessionService {
     const user = this.persistence.findUserById(session.userId);
     if (!user) {
       throw new SessionAuthenticationError("AUTH_REQUIRED");
+    }
+
+    if (now - lastSeenAt >= SESSION_LAST_SEEN_UPDATE_INTERVAL_MS) {
+      this.persistence.updateLastSeenAt(tokenHash, new Date(now).toISOString());
     }
 
     return user;

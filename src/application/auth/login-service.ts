@@ -2,6 +2,10 @@ import { createHash, randomBytes, randomUUID } from "node:crypto";
 
 import { verifyPassword } from "../../domain/auth/password";
 import { loginInputSchema } from "../../domain/auth/validation";
+import {
+  type LoginAttemptLimiter,
+  MemoryLoginAttemptLimiter,
+} from "./login-attempt-limiter";
 
 const SESSION_ABSOLUTE_LIFETIME_MS = 7 * 24 * 60 * 60 * 1_000;
 const DUMMY_PASSWORD_HASH = [
@@ -64,6 +68,7 @@ type LoginServiceOptions = {
   now?: () => Date;
   createId?: () => string;
   createToken?: () => string;
+  attemptLimiter?: LoginAttemptLimiter;
 };
 
 function defaultSessionToken(): string {
@@ -78,6 +83,7 @@ export class LoginService {
   private readonly now: () => Date;
   private readonly createId: () => string;
   private readonly createToken: () => string;
+  private readonly attemptLimiter: LoginAttemptLimiter;
 
   constructor(
     private readonly persistence: LoginPersistence,
@@ -86,6 +92,9 @@ export class LoginService {
     this.now = options.now ?? (() => new Date());
     this.createId = options.createId ?? randomUUID;
     this.createToken = options.createToken ?? defaultSessionToken;
+    this.attemptLimiter =
+      options.attemptLimiter ??
+      new MemoryLoginAttemptLimiter({ now: this.now });
   }
 
   async login(input: unknown): Promise<LoginResult> {
@@ -102,39 +111,48 @@ export class LoginService {
       );
     }
 
-    const user = this.persistence.findUserByNormalizedUsername(
+    return this.attemptLimiter.run(
       validation.data.usernameNormalized,
-    );
-    const credentialIsValid = await verifyPassword(
-      validation.data.password,
-      user?.passwordHash ?? DUMMY_PASSWORD_HASH,
-    );
+      async (attemptState) => {
+        attemptState.assertAllowed();
 
-    if (!user || !credentialIsValid) {
-      throw new InvalidCredentialsError();
-    }
+        const user = this.persistence.findUserByNormalizedUsername(
+          validation.data.usernameNormalized,
+        );
+        const credentialIsValid = await verifyPassword(
+          validation.data.password,
+          user?.passwordHash ?? DUMMY_PASSWORD_HASH,
+        );
 
-    const createdAt = this.now();
-    const expiresAt = new Date(
-      createdAt.getTime() + SESSION_ABSOLUTE_LIFETIME_MS,
-    );
-    const sessionToken = this.createToken();
+        if (!user || !credentialIsValid) {
+          attemptState.recordFailure();
+          throw new InvalidCredentialsError();
+        }
 
-    this.persistence.createSession({
-      id: `ses_${this.createId()}`,
-      userId: user.id,
-      tokenHash: hashSessionToken(sessionToken),
-      selectedAccountRef: null,
-      createdAt: createdAt.toISOString(),
-      lastSeenAt: createdAt.toISOString(),
-      expiresAt: expiresAt.toISOString(),
-    });
+        const createdAt = this.now();
+        const expiresAt = new Date(
+          createdAt.getTime() + SESSION_ABSOLUTE_LIFETIME_MS,
+        );
+        const sessionToken = this.createToken();
 
-    return {
-      session: {
-        token: sessionToken,
-        expiresAt,
+        this.persistence.createSession({
+          id: `ses_${this.createId()}`,
+          userId: user.id,
+          tokenHash: hashSessionToken(sessionToken),
+          selectedAccountRef: null,
+          createdAt: createdAt.toISOString(),
+          lastSeenAt: createdAt.toISOString(),
+          expiresAt: expiresAt.toISOString(),
+        });
+        attemptState.clear();
+
+        return {
+          session: {
+            token: sessionToken,
+            expiresAt,
+          },
+        };
       },
-    };
+    );
   }
 }

@@ -8,6 +8,7 @@ import {
   type LoginResult,
   LoginValidationError,
 } from "../../../../../src/application/auth/login-service";
+import { LoginRateLimitedError } from "../../../../../src/application/auth/login-attempt-limiter";
 import { getRuntimeLoginService } from "../../../../../src/infrastructure/auth/runtime-login-service";
 
 const SESSION_COOKIE_NAME = "my_wts_session";
@@ -22,6 +23,7 @@ type ErrorCode =
   | "DATABASE_ERROR"
   | "FORBIDDEN"
   | "INTERNAL_ERROR"
+  | "AUTH_RATE_LIMITED"
   | "INVALID_CREDENTIALS"
   | "VALIDATION_FAILED";
 
@@ -31,20 +33,29 @@ function errorResponse(
   code: ErrorCode,
   message: string,
   details: Record<string, unknown> = {},
+  options: {
+    retryable?: boolean;
+    retryAfterSeconds?: number;
+  } = {},
 ): NextResponse {
+  const headers = new Headers({ "Cache-Control": "no-store" });
+  if (options.retryAfterSeconds !== undefined) {
+    headers.set("Retry-After", options.retryAfterSeconds.toString());
+  }
+
   return NextResponse.json(
     {
       error: {
         requestId,
         code,
         message,
-        retryable: false,
+        retryable: options.retryable ?? false,
         details,
       },
     },
     {
       status,
-      headers: { "Cache-Control": "no-store" },
+      headers,
     },
   );
 }
@@ -126,6 +137,19 @@ export function createLoginHandler(
           401,
           "INVALID_CREDENTIALS",
           "사용자명 또는 비밀번호를 확인해 주세요.",
+        );
+      }
+      if (error instanceof LoginRateLimitedError) {
+        return errorResponse(
+          requestId,
+          429,
+          "AUTH_RATE_LIMITED",
+          "로그인 시도가 너무 많습니다. 잠시 후 다시 시도해 주세요.",
+          {},
+          {
+            retryable: true,
+            retryAfterSeconds: error.retryAfterSeconds,
+          },
         );
       }
       if (error instanceof LoginPersistenceError) {
