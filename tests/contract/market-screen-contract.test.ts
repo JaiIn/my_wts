@@ -42,6 +42,37 @@ describe("market screen server-to-client contract", () => {
     expect(
       data.warningErrors.find(({ symbol }) => symbol === "ERR1")?.error.kind,
     ).toBe("unavailable");
+    const initialOrderbook = data.orderbooks.find(
+      ({ symbol }) => symbol === "005930",
+    );
+    expect(initialOrderbook?.currency).toBe("KRW");
+    expect(initialOrderbook?.asks[0]).toEqual({
+      price: "72100",
+      volume: "9007199254740993",
+    });
+    expect(initialOrderbook?.bids[0]).toEqual({
+      price: "72000",
+      volume: "5200",
+    });
+    expect(
+      data.trades.find(({ symbol }) => symbol === "005930")?.trades[0],
+    ).toMatchObject({
+      price: "72000",
+      volume: "120",
+      currency: "KRW",
+    });
+    expect(
+      data.orderbooks.find(({ symbol }) => symbol === "EMPTY1"),
+    ).toMatchObject({ asks: [], bids: [] });
+    expect(
+      data.trades.find(({ symbol }) => symbol === "FWD1")?.trades,
+    ).toEqual([]);
+    expect(
+      data.orderbookErrors.find(({ symbol }) => symbol === "ERR1")?.error.kind,
+    ).toBe("unavailable");
+    expect(
+      data.tradeErrors.find(({ symbol }) => symbol === "ERR1")?.error.kind,
+    ).toBe("unavailable");
   });
 
   it("does not expose persistence or authentication internals", async () => {
@@ -57,5 +88,9 @@ describe("market screen server-to-client contract", () => {
     expect(serialized).not.toContain("VI_STATIC");
     expect(serialized).not.toContain("internal-error");
     expect(serialized).not.toContain("mock-warning-request");
+    expect(serialized).not.toContain("mock-orderbook-request");
+    expect(serialized).not.toContain("mock-trades-request");
+    expect(serialized).not.toContain("Mock orderbook lookup failed.");
+    expect(serialized).not.toContain("Mock trades lookup failed.");
   });
 });

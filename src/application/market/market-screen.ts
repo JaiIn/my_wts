@@ -1,4 +1,8 @@
-import type { MarketWarning } from "../../domain/market/market";
+import type {
+  MarketOrderbook,
+  MarketTrade,
+  MarketWarning,
+} from "../../domain/market/market";
 import { TossEnvelopeDecodeError } from "../../integrations/toss/envelope";
 import {
   MarketDataNotFoundError,
@@ -33,6 +37,32 @@ export type MarketWarningView = {
   endDate?: string | null;
 };
 
+export type MarketOrderbookLevelView = {
+  price: string;
+  volume: string;
+};
+
+export type MarketOrderbookView = {
+  symbol: string;
+  observedAt?: string | null;
+  currency: string;
+  asks: readonly MarketOrderbookLevelView[];
+  bids: readonly MarketOrderbookLevelView[];
+};
+
+export type MarketTradeView = {
+  key: string;
+  price: string;
+  volume: string;
+  observedAt: string;
+  currency: string;
+};
+
+export type SymbolTradesView = {
+  symbol: string;
+  trades: readonly MarketTradeView[];
+};
+
 export type MarketScreenErrorView = {
   kind: "invalid-data" | "not-found" | "unavailable" | "unexpected";
   title: string;
@@ -55,8 +85,12 @@ export type MarketScreenData = {
   stocks: readonly MarketStockView[];
   prices: readonly MarketPriceView[];
   warnings: readonly SymbolWarningsView[];
+  orderbooks: readonly MarketOrderbookView[];
+  trades: readonly SymbolTradesView[];
   priceErrors: readonly SymbolErrorView[];
   warningErrors: readonly SymbolErrorView[];
+  orderbookErrors: readonly SymbolErrorView[];
+  tradeErrors: readonly SymbolErrorView[];
   screenError?: MarketScreenErrorView;
 };
 
@@ -113,7 +147,7 @@ function warningView(warning: MarketWarning, index: number): MarketWarningView {
 
 export function safeMarketScreenError(
   error: unknown,
-  subject: "market" | "price" | "warnings",
+  subject: "market" | "orderbook" | "price" | "trades" | "warnings",
 ): MarketScreenErrorView {
   if (error instanceof MarketDataNotFoundError) {
     return {
@@ -121,6 +155,10 @@ export function safeMarketScreenError(
       title:
         subject === "price"
           ? "현재가를 찾을 수 없습니다."
+          : subject === "orderbook"
+            ? "호가를 찾을 수 없습니다."
+            : subject === "trades"
+              ? "체결 내역을 찾을 수 없습니다."
           : subject === "warnings"
             ? "종목 유의사항을 찾을 수 없습니다."
             : "시장 데이터를 찾을 수 없습니다.",
@@ -135,6 +173,10 @@ export function safeMarketScreenError(
       title:
         subject === "warnings"
           ? "종목 유의사항을 불러오지 못했습니다."
+          : subject === "orderbook"
+            ? "호가를 불러오지 못했습니다."
+            : subject === "trades"
+              ? "체결 내역을 불러오지 못했습니다."
           : subject === "price"
             ? "현재가를 불러오지 못했습니다."
             : "시장 데이터를 불러오지 못했습니다.",
@@ -166,9 +208,42 @@ export function failedMarketScreen(error: unknown): MarketScreenData {
     stocks: [],
     prices: [],
     warnings: [],
+    orderbooks: [],
+    trades: [],
     priceErrors: [],
     warningErrors: [],
+    orderbookErrors: [],
+    tradeErrors: [],
     screenError: safeMarketScreenError(error, "market"),
+  };
+}
+
+function orderbookView(
+  symbol: string,
+  orderbook: MarketOrderbook,
+): MarketOrderbookView {
+  return {
+    symbol,
+    observedAt: orderbook.observedAt,
+    currency: orderbook.currency,
+    asks: orderbook.asks.map(({ price, volume }) => ({ price, volume })),
+    bids: orderbook.bids.map(({ price, volume }) => ({ price, volume })),
+  };
+}
+
+function tradesView(
+  symbol: string,
+  trades: readonly MarketTrade[],
+): SymbolTradesView {
+  return {
+    symbol,
+    trades: trades.map(({ currency, observedAt, price, volume }, index) => ({
+      key: `${symbol}-${observedAt}-${index}`,
+      price,
+      volume,
+      observedAt,
+      currency,
+    })),
   };
 }
 
@@ -188,8 +263,12 @@ export async function loadMarketScreen(
       stocks: [],
       prices: [],
       warnings: [],
+      orderbooks: [],
+      trades: [],
       priceErrors: [],
       warningErrors: [],
+      orderbookErrors: [],
+      tradeErrors: [],
     };
   }
 
@@ -229,6 +308,40 @@ export async function loadMarketScreen(
       }
     }),
   );
+  const orderbookResults = await Promise.all(
+    stocks.map(async ({ symbol }) => {
+      try {
+        return {
+          ok: true as const,
+          symbol,
+          value: orderbookView(symbol, await service.getOrderbook(symbol)),
+        };
+      } catch (error) {
+        return {
+          ok: false as const,
+          symbol,
+          error: safeMarketScreenError(error, "orderbook"),
+        };
+      }
+    }),
+  );
+  const tradeResults = await Promise.all(
+    stocks.map(async ({ symbol }) => {
+      try {
+        return {
+          ok: true as const,
+          symbol,
+          value: tradesView(symbol, await service.getTrades(symbol, 20)),
+        };
+      } catch (error) {
+        return {
+          ok: false as const,
+          symbol,
+          error: safeMarketScreenError(error, "trades"),
+        };
+      }
+    }),
+  );
 
   return {
     initialSymbol: initialStock?.symbol ?? "",
@@ -252,10 +365,22 @@ export async function loadMarketScreen(
     warnings: warningResults
       .filter((result) => result.ok)
       .map(({ symbol, values }) => ({ symbol, warnings: values })),
+    orderbooks: orderbookResults
+      .filter((result) => result.ok)
+      .map(({ value }) => value),
+    trades: tradeResults
+      .filter((result) => result.ok)
+      .map(({ value }) => value),
     priceErrors: priceResults
       .filter((result) => !result.ok)
       .map(({ error, symbol }) => ({ symbol, error })),
     warningErrors: warningResults
+      .filter((result) => !result.ok)
+      .map(({ error, symbol }) => ({ symbol, error })),
+    orderbookErrors: orderbookResults
+      .filter((result) => !result.ok)
+      .map(({ error, symbol }) => ({ symbol, error })),
+    tradeErrors: tradeResults
       .filter((result) => !result.ok)
       .map(({ error, symbol }) => ({ symbol, error })),
   };

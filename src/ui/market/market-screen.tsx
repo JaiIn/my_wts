@@ -3,10 +3,12 @@
 import { useId, useMemo, useState, type KeyboardEvent } from "react";
 
 import type {
+  MarketOrderbookView,
   MarketPriceView,
   MarketScreenData,
   MarketScreenErrorView,
   MarketStockView,
+  MarketTradeView,
   MarketWarningView,
 } from "../../application/market/market-screen";
 import { searchMarketStocks } from "./market-search";
@@ -223,12 +225,216 @@ function PriceCard({
   );
 }
 
+function OrderbookWidget({
+  error,
+  orderbook,
+  stock,
+}: {
+  error?: MarketScreenErrorView;
+  orderbook?: MarketOrderbookView;
+  stock?: MarketStockView;
+}) {
+  return (
+    <section
+      aria-labelledby="orderbook-title"
+      className="min-w-0 rounded-3xl border border-slate-200 bg-white p-6 shadow-sm"
+    >
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h2 id="orderbook-title" className="text-lg font-semibold">
+            호가
+          </h2>
+          <p className="mt-1 text-sm text-slate-600">
+            {stock ? `${stock.symbol} · ${stock.displayName}` : "선택 종목 없음"}
+          </p>
+        </div>
+        <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-700">
+          MOCK · 비실시간
+        </span>
+      </div>
+
+      {error ? (
+        <div className="mt-5">
+          <InlineError error={error} />
+        </div>
+      ) : !stock || !orderbook ? (
+        <div role="status" className="mt-5">
+          <h3 className="font-medium">호가가 없습니다.</h3>
+          <p className="mt-1 text-sm text-slate-600">
+            선택한 종목의 호가 데이터가 제공되지 않습니다.
+          </p>
+        </div>
+      ) : orderbook.asks.length === 0 && orderbook.bids.length === 0 ? (
+        <div role="status" className="mt-5">
+          <h3 className="font-medium">호가가 비어 있습니다.</h3>
+          <p className="mt-1 text-sm text-slate-600">
+            현재 표시할 매도·매수 호가가 없습니다.
+          </p>
+        </div>
+      ) : (
+        <>
+          <div className="mt-5 overflow-x-auto">
+            <table className="w-full min-w-[28rem] border-collapse text-sm">
+              <caption className="sr-only">
+                {stock.displayName} 매도 및 매수 호가
+              </caption>
+              <thead>
+                <tr className="border-b border-slate-200 text-left text-slate-600">
+                  <th scope="col" className="px-3 py-2 font-medium">
+                    구분
+                  </th>
+                  <th scope="col" className="px-3 py-2 text-right font-medium">
+                    가격
+                  </th>
+                  <th scope="col" className="px-3 py-2 text-right font-medium">
+                    잔량
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {orderbook.asks.map((level) => (
+                  <tr
+                    key={`ask-${level.price}`}
+                    className="border-b border-slate-100 bg-red-50/50"
+                  >
+                    <th
+                      scope="row"
+                      className="px-3 py-2 text-left font-medium text-red-800"
+                    >
+                      매도 호가
+                    </th>
+                    <td className="px-3 py-2 text-right font-mono">
+                      {formatDecimalString(level.price)} {orderbook.currency}
+                    </td>
+                    <td className="px-3 py-2 text-right font-mono">
+                      {formatDecimalString(level.volume)}
+                    </td>
+                  </tr>
+                ))}
+                {orderbook.bids.map((level) => (
+                  <tr
+                    key={`bid-${level.price}`}
+                    className="border-b border-slate-100 bg-blue-50/50"
+                  >
+                    <th
+                      scope="row"
+                      className="px-3 py-2 text-left font-medium text-blue-800"
+                    >
+                      매수 호가
+                    </th>
+                    <td className="px-3 py-2 text-right font-mono">
+                      {formatDecimalString(level.price)} {orderbook.currency}
+                    </td>
+                    <td className="px-3 py-2 text-right font-mono">
+                      {formatDecimalString(level.volume)}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          <p className="mt-4 text-xs text-slate-500">
+            데이터 시각: {orderbook.observedAt ?? "제공되지 않음"}
+          </p>
+        </>
+      )}
+    </section>
+  );
+}
+
+function TradesWidget({
+  error,
+  stock,
+  trades,
+}: {
+  error?: MarketScreenErrorView;
+  stock?: MarketStockView;
+  trades: readonly MarketTradeView[];
+}) {
+  return (
+    <section
+      aria-labelledby="trades-title"
+      className="min-w-0 rounded-3xl border border-slate-200 bg-white p-6 shadow-sm"
+    >
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h2 id="trades-title" className="text-lg font-semibold">
+            최근 체결
+          </h2>
+          <p className="mt-1 text-sm text-slate-600">
+            {stock ? `${stock.symbol} · ${stock.displayName}` : "선택 종목 없음"}
+          </p>
+        </div>
+        <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-700">
+          MOCK · 비실시간
+        </span>
+      </div>
+
+      {error ? (
+        <div className="mt-5">
+          <InlineError error={error} />
+        </div>
+      ) : !stock || trades.length === 0 ? (
+        <div role="status" className="mt-5">
+          <h3 className="font-medium">체결 내역이 없습니다.</h3>
+          <p className="mt-1 text-sm text-slate-600">
+            선택한 종목의 당일 체결 데이터가 제공되지 않습니다.
+          </p>
+        </div>
+      ) : (
+        <div className="mt-5 overflow-x-auto">
+          <table className="w-full min-w-[30rem] border-collapse text-sm">
+            <caption className="sr-only">
+              {stock.displayName} 최근 체결 내역
+            </caption>
+            <thead>
+              <tr className="border-b border-slate-200 text-left text-slate-600">
+                <th scope="col" className="px-3 py-2 font-medium">
+                  체결 시각
+                </th>
+                <th scope="col" className="px-3 py-2 text-right font-medium">
+                  체결가
+                </th>
+                <th scope="col" className="px-3 py-2 text-right font-medium">
+                  체결 수량
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              {trades.map((trade) => (
+                <tr key={trade.key} className="border-b border-slate-100">
+                  <td className="px-3 py-2">
+                    <time dateTime={trade.observedAt}>{trade.observedAt}</time>
+                  </td>
+                  <td className="px-3 py-2 text-right font-mono">
+                    {formatDecimalString(trade.price)} {trade.currency}
+                  </td>
+                  <td className="px-3 py-2 text-right font-mono">
+                    {formatDecimalString(trade.volume)}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          <p className="mt-4 text-xs leading-5 text-slate-500">
+            체결 내역은 가격 방향이나 주문 신호를 의미하지 않습니다.
+          </p>
+        </div>
+      )}
+    </section>
+  );
+}
+
 export function MarketScreen({
   initialSymbol,
+  orderbookErrors,
+  orderbooks,
   priceErrors,
   prices,
   screenError,
   stocks,
+  tradeErrors,
+  trades,
   warningErrors,
   warnings,
 }: MarketScreenData) {
@@ -253,6 +459,17 @@ export function MarketScreen({
     ({ symbol }) => symbol === selectedSymbol,
   )?.error;
   const selectedWarningError = warningErrors.find(
+    ({ symbol }) => symbol === selectedSymbol,
+  )?.error;
+  const selectedOrderbook = orderbooks.find(
+    ({ symbol }) => symbol === selectedSymbol,
+  );
+  const selectedTrades =
+    trades.find(({ symbol }) => symbol === selectedSymbol)?.trades ?? [];
+  const selectedOrderbookError = orderbookErrors.find(
+    ({ symbol }) => symbol === selectedSymbol,
+  )?.error;
+  const selectedTradeError = tradeErrors.find(
     ({ symbol }) => symbol === selectedSymbol,
   )?.error;
   const listboxOpen = results.length > 0;
@@ -411,6 +628,18 @@ export function MarketScreen({
                   stock={selectedStock}
                   price={selectedPrice}
                 />
+                <div className="grid min-w-0 gap-6 lg:grid-cols-2">
+                  <OrderbookWidget
+                    error={selectedOrderbookError}
+                    orderbook={selectedOrderbook}
+                    stock={selectedStock}
+                  />
+                  <TradesWidget
+                    error={selectedTradeError}
+                    stock={selectedStock}
+                    trades={selectedTrades}
+                  />
+                </div>
               </>
             ) : null}
           </>

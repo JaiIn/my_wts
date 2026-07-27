@@ -181,3 +181,130 @@ export const MOCK_WARNINGS_TOSS_ENVELOPES = deepFreeze({
     },
   },
 });
+
+export const MOCK_ORDERBOOK_TOSS_ENVELOPES = deepFreeze({
+  "005930": {
+    result: {
+      timestamp: "2025-01-02T09:30:00.000+09:00",
+      currency: "KRW",
+      asks: [
+        { price: "72100", volume: "9007199254740993" },
+        { price: "72200", volume: "3400" },
+        { price: "72300", volume: "1200" },
+      ],
+      bids: [
+        { price: "72000", volume: "5200" },
+        { price: "71900", volume: "4100" },
+        { price: "71800", volume: "2700" },
+      ],
+    },
+  },
+  AAPL: {
+    result: {
+      timestamp: "2025-01-02T22:30:00.000+09:00",
+      currency: "USD",
+      asks: [
+        { price: "185.70", volume: "410" },
+        { price: "185.75", volume: "250" },
+      ],
+      bids: [
+        { price: "185.65", volume: "180" },
+        { price: "185.60", volume: "320" },
+      ],
+    },
+  },
+  FWD1: {
+    result: {
+      timestamp: null,
+      currency: "XTS",
+      asks: [
+        {
+          price: "9007199254740993.223456789",
+          volume: "90071992547409931234567890",
+        },
+      ],
+      bids: [
+        {
+          price: "9007199254740993.023456789",
+          volume: "90071992547409931234567889",
+        },
+      ],
+    },
+  },
+  EMPTY1: {
+    result: {
+      timestamp: null,
+      currency: "XTS",
+      asks: [],
+      bids: [],
+    },
+  },
+  ERR1: {
+    error: {
+      requestId: "mock-orderbook-request",
+      code: "internal-error",
+      message: "Mock orderbook lookup failed.",
+      data: {},
+    },
+  },
+});
+
+export const MOCK_TRADES_TOSS_ENVELOPES = deepFreeze({
+  "005930": {
+    result: [
+      {
+        price: "72000",
+        volume: "120",
+        timestamp: "2025-01-02T09:30:42.000+09:00",
+        currency: "KRW",
+      },
+      {
+        price: "71900",
+        volume: "50",
+        timestamp: "2025-01-02T09:30:41.500+09:00",
+        currency: "KRW",
+      },
+      {
+        price: "72000",
+        volume: "9007199254740993",
+        timestamp: "2025-01-02T09:30:40.800+09:00",
+        currency: "KRW",
+      },
+    ],
+  },
+  AAPL: {
+    result: [
+      {
+        price: "185.70",
+        volume: "15",
+        timestamp: "2025-01-02T22:30:42.100+09:00",
+        currency: "USD",
+      },
+      {
+        price: "185.75",
+        volume: "8",
+        timestamp: "2025-01-02T22:30:41.700+09:00",
+        currency: "USD",
+      },
+    ],
+  },
+  FWD1: { result: [] },
+  EMPTY1: {
+    result: [
+      {
+        price: "100.00",
+        volume: "1",
+        timestamp: "2025-01-02T12:00:00.000+09:00",
+        currency: "XTS",
+      },
+    ],
+  },
+  ERR1: {
+    error: {
+      requestId: "mock-trades-request",
+      code: "internal-error",
+      message: "Mock trades lookup failed.",
+      data: {},
+    },
+  },
+});

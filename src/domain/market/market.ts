@@ -37,3 +37,22 @@ export type MarketWarning = {
   startDate?: string | null;
   endDate?: string | null;
 };
+
+export type MarketOrderbookLevel = {
+  price: DecimalString;
+  volume: DecimalString;
+};
+
+export type MarketOrderbook = {
+  observedAt?: string | null;
+  currency: string;
+  asks: readonly MarketOrderbookLevel[];
+  bids: readonly MarketOrderbookLevel[];
+};
+
+export type MarketTrade = {
+  price: DecimalString;
+  volume: DecimalString;
+  observedAt: string;
+  currency: string;
+};

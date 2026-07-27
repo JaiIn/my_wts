@@ -1,6 +1,8 @@
 import type {
+  MarketOrderbook,
   MarketPrice,
   MarketStock,
+  MarketTrade,
   MarketWarning,
 } from "../../domain/market/market";
 
@@ -9,6 +11,8 @@ export interface MarketService {
   getStock(symbol: string): Promise<MarketStock>;
   getPrice(symbol: string): Promise<MarketPrice>;
   getWarnings(symbol: string): Promise<readonly MarketWarning[]>;
+  getOrderbook(symbol: string): Promise<MarketOrderbook>;
+  getTrades(symbol: string, count?: number): Promise<readonly MarketTrade[]>;
 }
 
 export class MarketDataNotFoundError extends Error {

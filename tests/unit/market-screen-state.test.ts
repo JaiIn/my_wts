@@ -27,6 +27,10 @@ function emptyService(overrides: Partial<MarketService> = {}): MarketService {
       throw new MarketDataNotFoundError();
     },
     getWarnings: async () => [],
+    getOrderbook: async () => {
+      throw new MarketDataNotFoundError();
+    },
+    getTrades: async () => [],
     ...overrides,
   };
 }
