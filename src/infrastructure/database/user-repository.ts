@@ -3,6 +3,8 @@ import { eq } from "drizzle-orm";
 import type { AppDatabase } from "./database";
 import { type NewUserRecord, type UserRecord, users } from "./schema";
 
+type UserDatabase = Pick<AppDatabase, "insert" | "select">;
+
 export class UsernameAlreadyExistsError extends Error {
   constructor() {
     super("USERNAME_ALREADY_EXISTS");
@@ -18,7 +20,7 @@ function isUsernameUniqueConstraintError(error: unknown): boolean {
 }
 
 export class UserRepository {
-  constructor(private readonly database: AppDatabase) {}
+  constructor(private readonly database: UserDatabase) {}
 
   create(user: NewUserRecord): UserRecord {
     try {

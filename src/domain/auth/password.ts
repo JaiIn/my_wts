@@ -4,6 +4,8 @@ import {
   timingSafeEqual,
 } from "node:crypto";
 
+import { PASSWORD_MAX_LENGTH, PASSWORD_MIN_LENGTH } from "./auth-constants";
+
 const SCRYPT_N = 32_768;
 const SCRYPT_R = 8;
 const SCRYPT_P = 1;
@@ -12,8 +14,7 @@ const SCRYPT_DERIVED_KEY_BYTES = 64;
 const SCRYPT_MAX_MEMORY_BYTES = 64 * 1024 * 1024;
 const SCRYPT_PREFIX = "scrypt$v1$N=32768,r=8,p=1";
 
-export const PASSWORD_MIN_LENGTH = 10;
-export const PASSWORD_MAX_LENGTH = 128;
+export { PASSWORD_MAX_LENGTH, PASSWORD_MIN_LENGTH };
 
 type ParsedPasswordHash = {
   salt: Buffer;

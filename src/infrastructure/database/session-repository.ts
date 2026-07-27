@@ -3,8 +3,10 @@ import { eq } from "drizzle-orm";
 import type { AppDatabase } from "./database";
 import { type NewSessionRecord, type SessionRecord, sessions } from "./schema";
 
+type SessionDatabase = Pick<AppDatabase, "delete" | "insert" | "select">;
+
 export class SessionRepository {
-  constructor(private readonly database: AppDatabase) {}
+  constructor(private readonly database: SessionDatabase) {}
 
   create(session: NewSessionRecord): SessionRecord {
     return this.database.insert(sessions).values(session).returning().get();
