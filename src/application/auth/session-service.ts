@@ -1,6 +1,5 @@
-import { createHash } from "node:crypto";
+import { hashCanonicalSessionToken } from "../../domain/auth/session-token";
 
-const SESSION_TOKEN_BYTES = 32;
 const SESSION_IDLE_LIFETIME_MS = 12 * 60 * 60 * 1_000;
 
 export type SessionRecordForAuthentication = {
@@ -43,26 +42,6 @@ type SessionServiceOptions = {
   now?: () => Date;
 };
 
-function parseSessionToken(token: unknown): string | undefined {
-  if (typeof token !== "string" || !/^[A-Za-z0-9_-]+$/.test(token)) {
-    return undefined;
-  }
-
-  const decoded = Buffer.from(token, "base64url");
-  if (
-    decoded.length !== SESSION_TOKEN_BYTES ||
-    decoded.toString("base64url") !== token
-  ) {
-    return undefined;
-  }
-
-  return token;
-}
-
-function hashSessionToken(token: string): string {
-  return createHash("sha256").update(token).digest("hex");
-}
-
 function parseStoredDate(value: string): number | undefined {
   const timestamp = Date.parse(value);
   return Number.isFinite(timestamp) ? timestamp : undefined;
@@ -79,14 +58,12 @@ export class SessionService {
   }
 
   authenticate(token: unknown): SessionUser {
-    const parsedToken = parseSessionToken(token);
-    if (!parsedToken) {
+    const tokenHash = hashCanonicalSessionToken(token);
+    if (!tokenHash) {
       throw new SessionAuthenticationError("AUTH_REQUIRED");
     }
 
-    const session = this.persistence.findSessionByTokenHash(
-      hashSessionToken(parsedToken),
-    );
+    const session = this.persistence.findSessionByTokenHash(tokenHash);
     if (!session) {
       throw new SessionAuthenticationError("AUTH_REQUIRED");
     }
