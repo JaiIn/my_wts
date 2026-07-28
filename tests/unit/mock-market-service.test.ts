@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { MarketDataNotFoundError } from "../../src/application/market/market-service";
 import { decimalFromString } from "../../src/domain/common/decimal";
 import {
+  MOCK_CANDLE_TOSS_DATASETS,
   MOCK_ORDERBOOK_TOSS_ENVELOPES,
   MOCK_PRICES_TOSS_ENVELOPE,
   MOCK_STOCKS_TOSS_ENVELOPE,
@@ -11,6 +12,7 @@ import {
 import { createMockMarketService } from "../../src/infrastructure/market/mock-market-service";
 import { decodeTossEnvelope } from "../../src/integrations/toss/envelope";
 import {
+  tossCandlePageResponseSchema,
   tossOrderbookResponseSchema,
   tossPriceResponseListSchema,
   tossStockInfoListSchema,
@@ -49,6 +51,24 @@ describe("mock market fixtures and service", () => {
     expect(orderbook.ok && orderbook.result.asks).toHaveLength(3);
     expect(orderbook.ok && orderbook.result.bids).toHaveLength(3);
     expect(trades.ok && trades.result).toHaveLength(3);
+  });
+
+  it("decodes candle pages through the frozen Toss envelope contract", () => {
+    const dataset = MOCK_CANDLE_TOSS_DATASETS.find(
+      ({ interval, symbol }) => symbol === "005930" && interval === "1d",
+    )!;
+    const decoded = decodeTossEnvelope(
+      {
+        result: {
+          candles: dataset.candles.slice(0, 2),
+          nextBefore: dataset.candles[2]?.timestamp,
+        },
+      },
+      tossCandlePageResponseSchema,
+    );
+
+    expect(decoded.ok).toBe(true);
+    expect(decoded.ok && decoded.result.candles).toHaveLength(2);
   });
 
   it("preserves KR, US, and unknown enum values at the DTO boundary", () => {
@@ -159,6 +179,7 @@ describe("mock market fixtures and service", () => {
     await service.getWarnings("AAPL");
     await service.getOrderbook("AAPL");
     await service.getTrades("AAPL");
+    await service.getCandles({ symbol: "AAPL", interval: "1d" });
 
     expect(fetchSpy).not.toHaveBeenCalled();
   });
@@ -383,5 +404,229 @@ describe("mock market fixtures and service", () => {
     await expect(
       service.getTrades("005930", 1).then((trades) => trades[0]?.price),
     ).resolves.toBe("101");
+  });
+
+  it("returns deterministic first, middle, and last candle pages", async () => {
+    const service = createMockMarketService();
+    const first = await service.getCandles({
+      symbol: "005930",
+      interval: "1d",
+    });
+    const second = await service.getCandles({
+      symbol: "005930",
+      interval: "1d",
+      before: first.nextBefore!,
+    });
+    const last = await service.getCandles({
+      symbol: "005930",
+      interval: "1d",
+      before: second.nextBefore!,
+    });
+    const timestamps = [...first.candles, ...second.candles, ...last.candles].map(
+      ({ timestamp }) => timestamp,
+    );
+
+    expect(first.candles).toHaveLength(100);
+    expect(second.candles).toHaveLength(100);
+    expect(last.candles).toHaveLength(1);
+    expect(first.nextBefore).toBe(second.candles[0]?.timestamp);
+    expect(second.nextBefore).toBe(last.candles[0]?.timestamp);
+    expect(last.nextBefore).toBeNull();
+    expect(new Set(timestamps).size).toBe(201);
+    expect(timestamps).toEqual(
+      [...timestamps].sort(
+        (left, right) => Date.parse(right) - Date.parse(left),
+      ),
+    );
+  });
+
+  it("treats cursor as opaque and safely rejects invalid values", async () => {
+    const service = createMockMarketService();
+
+    await expect(
+      service.getCandles({
+        symbol: "005930",
+        interval: "1d",
+        before: "2025-01-01T00:00:00.000Z:not-a-real-cursor",
+      }),
+    ).rejects.toMatchObject({
+      name: "MarketDataInvalidCursorError",
+      code: "VALIDATION_FAILED",
+      status: 400,
+      retryable: false,
+    });
+    await expect(
+      service.getCandles({ symbol: "005930", interval: "1d", count: 201 }),
+    ).rejects.toThrow("INVALID_CANDLE_COUNT");
+    await expect(
+      service.getCandles({
+        symbol: "005930",
+        interval: "1h" as "1d",
+      }),
+    ).rejects.toThrow("INVALID_CANDLE_INTERVAL");
+  });
+
+  it("returns the same page for concurrent requests without cursor mutation", async () => {
+    const service = createMockMarketService();
+    const first = await service.getCandles({
+      symbol: "005930",
+      interval: "1d",
+    });
+    const [left, right] = await Promise.all([
+      service.getCandles({
+        symbol: "005930",
+        interval: "1d",
+        before: first.nextBefore!,
+      }),
+      service.getCandles({
+        symbol: "005930",
+        interval: "1d",
+        before: first.nextBefore!,
+      }),
+    ]);
+
+    expect(left).toEqual(right);
+    expect(left.candles).toHaveLength(100);
+  });
+
+  it("preserves large candle decimals and isolates fixture mutation", async () => {
+    const service = createMockMarketService();
+    const first = await service.getCandles({
+      symbol: "FWD1",
+      interval: "1d",
+    });
+
+    expect(first.candles[0]).toMatchObject({
+      openPrice: "9007199254740993.123456780",
+      highPrice: "9007199254740993.123456790",
+      volume: "90071992547409931234567890",
+    });
+    (first.candles[0] as { closePrice: string }).closePrice = "1";
+    expect(
+      (
+        await service.getCandles({ symbol: "FWD1", interval: "1d" })
+      ).candles[0]?.closePrice,
+    ).toBe("9007199254740993.123456785");
+    expect(Object.isFrozen(MOCK_CANDLE_TOSS_DATASETS)).toBe(true);
+  });
+
+  it.each([
+    {
+      name: "negative value",
+      candles: [
+        {
+          timestamp: "2025-01-31T00:00:00.000Z",
+          openPrice: "-1",
+          highPrice: "1",
+          lowPrice: "0",
+          closePrice: "1",
+          volume: "1",
+          currency: "KRW",
+        },
+      ],
+    },
+    {
+      name: "high below close",
+      candles: [
+        {
+          timestamp: "2025-01-31T00:00:00.000Z",
+          openPrice: "10",
+          highPrice: "10",
+          lowPrice: "9",
+          closePrice: "11",
+          volume: "1",
+          currency: "KRW",
+        },
+      ],
+    },
+    {
+      name: "low above open",
+      candles: [
+        {
+          timestamp: "2025-01-31T00:00:00.000Z",
+          openPrice: "10",
+          highPrice: "12",
+          lowPrice: "11",
+          closePrice: "12",
+          volume: "1",
+          currency: "KRW",
+        },
+      ],
+    },
+    {
+      name: "duplicate timestamp",
+      candles: [
+        {
+          timestamp: "2025-01-31T00:00:00.000Z",
+          openPrice: "10",
+          highPrice: "12",
+          lowPrice: "9",
+          closePrice: "11",
+          volume: "1",
+          currency: "KRW",
+        },
+        {
+          timestamp: "2025-01-30T19:00:00.000-05:00",
+          openPrice: "10",
+          highPrice: "12",
+          lowPrice: "9",
+          closePrice: "11",
+          volume: "1",
+          currency: "KRW",
+        },
+      ],
+    },
+    {
+      name: "reversed timestamp order",
+      candles: [
+        {
+          timestamp: "2025-01-30T00:00:00.000Z",
+          openPrice: "10",
+          highPrice: "12",
+          lowPrice: "9",
+          closePrice: "11",
+          volume: "1",
+          currency: "KRW",
+        },
+        {
+          timestamp: "2025-01-31T00:00:00.000Z",
+          openPrice: "10",
+          highPrice: "12",
+          lowPrice: "9",
+          closePrice: "11",
+          volume: "1",
+          currency: "KRW",
+        },
+      ],
+    },
+  ])("rejects malformed candle $name", async ({ candles }) => {
+    const service = createMockMarketService({
+      stocksEnvelope: MOCK_STOCKS_TOSS_ENVELOPE,
+      pricesEnvelope: MOCK_PRICES_TOSS_ENVELOPE,
+      candleDatasets: [{ symbol: "005930", interval: "1d", candles }],
+      candleErrorEnvelopes: {},
+    });
+
+    await expect(
+      service.getCandles({ symbol: "005930", interval: "1d" }),
+    ).rejects.toMatchObject({
+      name: "TossEnvelopeDecodeError",
+      message: "TOSS_ENVELOPE_DECODE_FAILED",
+    });
+  });
+
+  it("returns deterministic candle empty and safe source-error states", async () => {
+    const service = createMockMarketService();
+
+    await expect(
+      service.getCandles({ symbol: "EMPTY1", interval: "1d" }),
+    ).resolves.toEqual({ candles: [], nextBefore: null });
+    await expect(
+      service.getCandles({ symbol: "ERR1", interval: "1d" }),
+    ).rejects.toMatchObject({
+      name: "MarketDataSourceError",
+      code: "UPSTREAM_UNAVAILABLE",
+      retryable: true,
+    });
   });
 });

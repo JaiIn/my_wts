@@ -10,6 +10,26 @@ function deepFreeze<T>(value: T): Readonly<T> {
   return Object.freeze(value);
 }
 
+function dailyTimestamp(index: number): string {
+  return new Date(Date.UTC(2025, 0, 31 - index, 0, 0, 0)).toISOString();
+}
+
+function buildDailyCandles(count: number) {
+  return Array.from({ length: count }, (_, index) => {
+    const open = 72000 - index * 10;
+    const close = open + (index % 2 === 0 ? 5 : -5);
+    return {
+      timestamp: dailyTimestamp(index),
+      openPrice: String(open),
+      highPrice: String(open + 20),
+      lowPrice: String(open - 20),
+      closePrice: String(close),
+      volume: index === 0 ? "9007199254740993" : String(1000000 + index),
+      currency: "KRW",
+    };
+  });
+}
+
 // Synthetic, deterministic test data. These values are never refreshed from a
 // live market source and must not be treated as current quotes.
 export const MOCK_STOCKS_TOSS_ENVELOPE = deepFreeze({
@@ -304,6 +324,132 @@ export const MOCK_TRADES_TOSS_ENVELOPES = deepFreeze({
       requestId: "mock-trades-request",
       code: "internal-error",
       message: "Mock trades lookup failed.",
+      data: {},
+    },
+  },
+});
+
+export const MOCK_CANDLE_TOSS_DATASETS = deepFreeze([
+  {
+    symbol: "005930",
+    interval: "1d",
+    candles: buildDailyCandles(201),
+  },
+  {
+    symbol: "005930",
+    interval: "1m",
+    candles: [
+      {
+        timestamp: "2025-01-31T09:02:00.000+09:00",
+        openPrice: "72010",
+        highPrice: "72030",
+        lowPrice: "72000",
+        closePrice: "72020",
+        volume: "1500",
+        currency: "KRW",
+      },
+      {
+        timestamp: "2025-01-31T09:01:00.000+09:00",
+        openPrice: "72000",
+        highPrice: "72020",
+        lowPrice: "71990",
+        closePrice: "72010",
+        volume: "1200",
+        currency: "KRW",
+      },
+      {
+        timestamp: "2025-01-31T09:00:00.000+09:00",
+        openPrice: "71990",
+        highPrice: "72010",
+        lowPrice: "71980",
+        closePrice: "72000",
+        volume: "1000",
+        currency: "KRW",
+      },
+    ],
+  },
+  {
+    symbol: "AAPL",
+    interval: "1d",
+    candles: [
+      {
+        timestamp: "2025-01-31T09:30:00.000-05:00",
+        openPrice: "185.70",
+        highPrice: "185.70",
+        lowPrice: "185.70",
+        closePrice: "185.70",
+        volume: "1",
+        currency: "USD",
+      },
+    ],
+  },
+  {
+    symbol: "AAPL",
+    interval: "1m",
+    candles: [
+      {
+        timestamp: "2025-01-31T09:31:00.000-05:00",
+        openPrice: "185.7001",
+        highPrice: "185.7002",
+        lowPrice: "185.7000",
+        closePrice: "185.70015",
+        volume: "8",
+        currency: "USD",
+      },
+      {
+        timestamp: "2025-01-31T09:30:00.000-05:00",
+        openPrice: "185.7000",
+        highPrice: "185.7001",
+        lowPrice: "185.6999",
+        closePrice: "185.7001",
+        volume: "5",
+        currency: "USD",
+      },
+    ],
+  },
+  {
+    symbol: "FWD1",
+    interval: "1d",
+    candles: [
+      {
+        timestamp: "2025-01-31T00:00:00.000Z",
+        openPrice: "9007199254740993.123456780",
+        highPrice: "9007199254740993.123456790",
+        lowPrice: "9007199254740993.123456770",
+        closePrice: "9007199254740993.123456785",
+        volume: "90071992547409931234567890",
+        currency: "XTS",
+      },
+      {
+        timestamp: "2025-01-30T00:00:00.000Z",
+        openPrice: "9007199254740993.123456775",
+        highPrice: "9007199254740993.123456785",
+        lowPrice: "9007199254740993.123456765",
+        closePrice: "9007199254740993.123456780",
+        volume: "90071992547409931234567889",
+        currency: "XTS",
+      },
+    ],
+  },
+  { symbol: "FWD1", interval: "1m", candles: [] },
+  { symbol: "EMPTY1", interval: "1d", candles: [] },
+  { symbol: "EMPTY1", interval: "1m", candles: [] },
+] as const);
+
+export const MOCK_CANDLE_ERROR_TOSS_ENVELOPES = deepFreeze({
+  "ERR1:1d": {
+    error: {
+      requestId: "mock-candle-request",
+      code: "internal-error",
+      message: "Mock candle lookup failed.",
+      data: {},
+    },
+  },
+  "ERR1:1m": {
+    error: {
+      requestId: "mock-candle-request",
+      code: "internal-error",
+      message: "Mock candle lookup failed.",
       data: {},
     },
   },

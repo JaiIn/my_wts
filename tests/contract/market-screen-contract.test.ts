@@ -73,6 +73,26 @@ describe("market screen server-to-client contract", () => {
     expect(
       data.tradeErrors.find(({ symbol }) => symbol === "ERR1")?.error.kind,
     ).toBe("unavailable");
+    const dailySeries = data.candleSeries.find(
+      ({ interval, symbol }) => symbol === "005930" && interval === "1d",
+    );
+    expect(dailySeries?.pages.map(({ candles }) => candles.length)).toEqual([
+      100, 100, 1,
+    ]);
+    expect(dailySeries?.pages[0]?.nextBefore).toBe(
+      dailySeries?.pages[1]?.candles[0]?.timestamp,
+    );
+    expect(dailySeries?.pages[2]?.nextBefore).toBeNull();
+    expect(
+      data.candleSeries.find(
+        ({ interval, symbol }) => symbol === "EMPTY1" && interval === "1d",
+      )?.pages[0]?.candles,
+    ).toEqual([]);
+    expect(
+      data.candleErrors.find(
+        ({ interval, symbol }) => symbol === "ERR1" && interval === "1d",
+      )?.error.kind,
+    ).toBe("unavailable");
   });
 
   it("does not expose persistence or authentication internals", async () => {
@@ -92,5 +112,7 @@ describe("market screen server-to-client contract", () => {
     expect(serialized).not.toContain("mock-trades-request");
     expect(serialized).not.toContain("Mock orderbook lookup failed.");
     expect(serialized).not.toContain("Mock trades lookup failed.");
+    expect(serialized).not.toContain("mock-candle-request");
+    expect(serialized).not.toContain("Mock candle lookup failed.");
   });
 });

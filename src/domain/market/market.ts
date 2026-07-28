@@ -56,3 +56,20 @@ export type MarketTrade = {
   observedAt: string;
   currency: string;
 };
+
+export type CandleInterval = "1m" | "1d";
+
+export type MarketCandle = {
+  timestamp: string;
+  openPrice: DecimalString;
+  highPrice: DecimalString;
+  lowPrice: DecimalString;
+  closePrice: DecimalString;
+  volume: DecimalString;
+  currency: string;
+};
+
+export type MarketCandlePage = {
+  candles: readonly MarketCandle[];
+  nextBefore?: string | null;
+};

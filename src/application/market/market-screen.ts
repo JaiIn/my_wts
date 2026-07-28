@@ -1,4 +1,6 @@
 import type {
+  CandleInterval,
+  MarketCandle,
   MarketOrderbook,
   MarketTrade,
   MarketWarning,
@@ -63,6 +65,31 @@ export type SymbolTradesView = {
   trades: readonly MarketTradeView[];
 };
 
+export type MarketCandleView = {
+  timestamp: string;
+  openPrice: string;
+  highPrice: string;
+  lowPrice: string;
+  closePrice: string;
+  volume: string;
+  currency: string;
+};
+
+export type MarketCandlePageView = {
+  candles: readonly MarketCandleView[];
+  nextBefore?: string | null;
+};
+
+export type SymbolCandleSeriesView = {
+  symbol: string;
+  interval: CandleInterval;
+  pages: readonly MarketCandlePageView[];
+};
+
+export type SymbolIntervalErrorView = SymbolErrorView & {
+  interval: CandleInterval;
+};
+
 export type MarketScreenErrorView = {
   kind: "invalid-data" | "not-found" | "unavailable" | "unexpected";
   title: string;
@@ -87,10 +114,12 @@ export type MarketScreenData = {
   warnings: readonly SymbolWarningsView[];
   orderbooks: readonly MarketOrderbookView[];
   trades: readonly SymbolTradesView[];
+  candleSeries: readonly SymbolCandleSeriesView[];
   priceErrors: readonly SymbolErrorView[];
   warningErrors: readonly SymbolErrorView[];
   orderbookErrors: readonly SymbolErrorView[];
   tradeErrors: readonly SymbolErrorView[];
+  candleErrors: readonly SymbolIntervalErrorView[];
   screenError?: MarketScreenErrorView;
 };
 
@@ -147,7 +176,13 @@ function warningView(warning: MarketWarning, index: number): MarketWarningView {
 
 export function safeMarketScreenError(
   error: unknown,
-  subject: "market" | "orderbook" | "price" | "trades" | "warnings",
+  subject:
+    | "candles"
+    | "market"
+    | "orderbook"
+    | "price"
+    | "trades"
+    | "warnings",
 ): MarketScreenErrorView {
   if (error instanceof MarketDataNotFoundError) {
     return {
@@ -155,6 +190,8 @@ export function safeMarketScreenError(
       title:
         subject === "price"
           ? "현재가를 찾을 수 없습니다."
+          : subject === "candles"
+            ? "캔들 데이터를 찾을 수 없습니다."
           : subject === "orderbook"
             ? "호가를 찾을 수 없습니다."
             : subject === "trades"
@@ -173,6 +210,8 @@ export function safeMarketScreenError(
       title:
         subject === "warnings"
           ? "종목 유의사항을 불러오지 못했습니다."
+          : subject === "candles"
+            ? "캔들 데이터를 불러오지 못했습니다."
           : subject === "orderbook"
             ? "호가를 불러오지 못했습니다."
             : subject === "trades"
@@ -210,10 +249,12 @@ export function failedMarketScreen(error: unknown): MarketScreenData {
     warnings: [],
     orderbooks: [],
     trades: [],
+    candleSeries: [],
     priceErrors: [],
     warningErrors: [],
     orderbookErrors: [],
     tradeErrors: [],
+    candleErrors: [],
     screenError: safeMarketScreenError(error, "market"),
   };
 }
@@ -247,6 +288,64 @@ function tradesView(
   };
 }
 
+function candleView(candle: MarketCandle): MarketCandleView {
+  return {
+    timestamp: candle.timestamp,
+    openPrice: candle.openPrice,
+    highPrice: candle.highPrice,
+    lowPrice: candle.lowPrice,
+    closePrice: candle.closePrice,
+    volume: candle.volume,
+    currency: candle.currency,
+  };
+}
+
+async function loadCandleSeries(
+  service: MarketService,
+  symbol: string,
+  interval: CandleInterval,
+): Promise<SymbolCandleSeriesView> {
+  const pages: MarketCandlePageView[] = [];
+  const timestamps = new Set<number>();
+  const cursors = new Set<string>();
+  let before: string | undefined;
+  let previousTimestamp = Number.POSITIVE_INFINITY;
+
+  for (let pageIndex = 0; pageIndex < 10; pageIndex += 1) {
+    const page = await service.getCandles({
+      symbol,
+      interval,
+      count: 100,
+      before,
+      adjusted: true,
+    });
+
+    for (const candle of page.candles) {
+      const timestamp = Date.parse(candle.timestamp);
+      if (timestamps.has(timestamp) || timestamp >= previousTimestamp) {
+        throw new TossEnvelopeDecodeError("INVALID_RESULT");
+      }
+      timestamps.add(timestamp);
+      previousTimestamp = timestamp;
+    }
+
+    pages.push({
+      candles: page.candles.map(candleView),
+      nextBefore: page.nextBefore,
+    });
+    if (!page.nextBefore) {
+      return { symbol, interval, pages };
+    }
+    if (cursors.has(page.nextBefore)) {
+      throw new TossEnvelopeDecodeError("INVALID_RESULT");
+    }
+    cursors.add(page.nextBefore);
+    before = page.nextBefore;
+  }
+
+  throw new TossEnvelopeDecodeError("INVALID_RESULT");
+}
+
 export async function loadMarketScreen(
   service: MarketService,
 ): Promise<MarketScreenData> {
@@ -265,10 +364,12 @@ export async function loadMarketScreen(
       warnings: [],
       orderbooks: [],
       trades: [],
+      candleSeries: [],
       priceErrors: [],
       warningErrors: [],
       orderbookErrors: [],
       tradeErrors: [],
+      candleErrors: [],
     };
   }
 
@@ -342,6 +443,27 @@ export async function loadMarketScreen(
       }
     }),
   );
+  const candleResults = await Promise.all(
+    stocks.flatMap(({ symbol }) =>
+      (["1d", "1m"] as const).map(async (interval) => {
+        try {
+          return {
+            ok: true as const,
+            symbol,
+            interval,
+            value: await loadCandleSeries(service, symbol, interval),
+          };
+        } catch (error) {
+          return {
+            ok: false as const,
+            symbol,
+            interval,
+            error: safeMarketScreenError(error, "candles"),
+          };
+        }
+      }),
+    ),
+  );
 
   return {
     initialSymbol: initialStock?.symbol ?? "",
@@ -371,6 +493,9 @@ export async function loadMarketScreen(
     trades: tradeResults
       .filter((result) => result.ok)
       .map(({ value }) => value),
+    candleSeries: candleResults
+      .filter((result) => result.ok)
+      .map(({ value }) => value),
     priceErrors: priceResults
       .filter((result) => !result.ok)
       .map(({ error, symbol }) => ({ symbol, error })),
@@ -383,5 +508,8 @@ export async function loadMarketScreen(
     tradeErrors: tradeResults
       .filter((result) => !result.ok)
       .map(({ error, symbol }) => ({ symbol, error })),
+    candleErrors: candleResults
+      .filter((result) => !result.ok)
+      .map(({ error, interval, symbol }) => ({ symbol, interval, error })),
   };
 }

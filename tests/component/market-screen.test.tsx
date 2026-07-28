@@ -38,6 +38,16 @@ describe("market screen", () => {
     expect(
       screen.getByRole("table", { name: "테스트 코리아 최근 체결 내역" }),
     ).toBeTruthy();
+    expect(screen.getByRole("heading", { name: "캔들 차트" })).toBeTruthy();
+    expect(screen.getByTestId("candle-count").textContent).toBe("100개");
+    expect(
+      screen.getByRole("table", {
+        name: "테스트 코리아 1d 캔들 원본 데이터",
+      }),
+    ).toBeTruthy();
+    expect(screen.getByLabelText("캔들 방향 범례").textContent).toContain(
+      "상승: 종가가 시가보다 높음",
+    );
   });
 
   it("supports accessible symbol search and keyboard selection", async () => {
@@ -106,6 +116,7 @@ describe("market screen", () => {
     expect(screen.queryByRole("heading", { name: "종목 유의사항" })).toBeNull();
     expect(screen.queryByRole("heading", { name: "호가" })).toBeNull();
     expect(screen.queryByRole("heading", { name: "최근 체결" })).toBeNull();
+    expect(screen.queryByRole("heading", { name: "캔들 차트" })).toBeNull();
     expect(screen.queryByText("등락")).toBeNull();
     expect(screen.queryByText("등락률")).toBeNull();
     expect(screen.queryByText("거래량")).toBeNull();
@@ -114,7 +125,11 @@ describe("market screen", () => {
     fireEvent.change(search, { target: { value: "aapl" } });
     fireEvent.click(screen.getByRole("option"));
     expect(screen.getByTestId("last-price").textContent).toBe("185.70 USD");
-    expect(screen.queryByRole("status")).toBeNull();
+    expect(
+      screen.queryByText(
+        "일치하는 종목이 없습니다. 다른 검색어를 입력해 주세요.",
+      ),
+    ).toBeNull();
   });
 
   it("does not render authentication or database internals into the client view", async () => {
@@ -264,6 +279,110 @@ describe("market screen", () => {
     expect(screen.queryByRole("form")).toBeNull();
   });
 
+  it("pages deterministically through first, middle, and last candle pages", async () => {
+    await renderMarketPage();
+
+    expect(screen.getByTestId("candle-count").textContent).toBe("100개");
+    fireEvent.click(
+      screen.getByRole("button", { name: "이전 캔들 더 보기" }),
+    );
+    expect(screen.getByTestId("candle-count").textContent).toBe("200개");
+    fireEvent.click(
+      screen.getByRole("button", { name: "이전 캔들 더 보기" }),
+    );
+    expect(screen.getByTestId("candle-count").textContent).toBe("201개");
+    expect(screen.getByText("마지막 페이지입니다.")).toBeTruthy();
+    expect(
+      screen.queryByRole("button", { name: "이전 캔들 더 보기" }),
+    ).toBeNull();
+    expect(
+      screen
+        .getByRole("table", {
+          name: "테스트 코리아 1d 캔들 원본 데이터",
+        })
+        .querySelectorAll("tbody tr"),
+    ).toHaveLength(201);
+  });
+
+  it("handles duplicate page clicks with bounded functional updates", async () => {
+    await renderMarketPage();
+    const loadMore = screen.getByRole("button", {
+      name: "이전 캔들 더 보기",
+    });
+
+    fireEvent.click(loadMore);
+    fireEvent.click(loadMore);
+
+    expect(screen.getByTestId("candle-count").textContent).toBe("201개");
+    expect(screen.getByText("마지막 페이지입니다.")).toBeTruthy();
+  });
+
+  it("resets candle pagination on interval and symbol changes", async () => {
+    await renderMarketPage();
+    const loadMore = screen.getByRole("button", {
+      name: "이전 캔들 더 보기",
+    });
+    fireEvent.click(loadMore);
+    expect(screen.getByTestId("candle-count").textContent).toBe("200개");
+
+    fireEvent.click(screen.getByRole("button", { name: "1분봉" }));
+    expect(screen.getByTestId("candle-count").textContent).toBe("3개");
+    expect(
+      screen.getByRole("button", { name: "1분봉" }).getAttribute("aria-pressed"),
+    ).toBe("true");
+
+    fireEvent.click(screen.getByRole("button", { name: "일봉" }));
+    expect(screen.getByTestId("candle-count").textContent).toBe("100개");
+
+    const search = screen.getByRole("combobox");
+    fireEvent.change(search, { target: { value: "aapl" } });
+    fireEvent.click(screen.getByRole("option"));
+    expect(screen.getByTestId("candle-count").textContent).toBe("1개");
+    expect(screen.getByText("보합: 종가와 시가가 같음")).toBeTruthy();
+
+    fireEvent.change(search, { target: { value: "005930" } });
+    fireEvent.click(screen.getByRole("option"));
+    expect(screen.getByTestId("candle-count").textContent).toBe("100개");
+  });
+
+  it("preserves large candle decimals and shows independent empty states", async () => {
+    await renderMarketPage();
+    const search = screen.getByRole("combobox");
+    fireEvent.change(search, { target: { value: "fwd1" } });
+    fireEvent.click(screen.getByRole("option"));
+
+    const table = screen.getByRole("table", {
+      name: "미래 계약 테스트 1d 캔들 원본 데이터",
+    });
+    expect(table.textContent).toContain(
+      "9,007,199,254,740,993.123456780 XTS",
+    );
+    expect(table.textContent).toContain("90,071,992,547,409,931,234,567,890");
+
+    fireEvent.click(screen.getByRole("button", { name: "1분봉" }));
+    expect(screen.getByText("캔들 데이터가 없습니다.")).toBeTruthy();
+    expect(screen.queryByTestId("candle-count")).toBeNull();
+
+    fireEvent.change(search, { target: { value: "empty1" } });
+    fireEvent.click(screen.getByRole("option"));
+    expect(screen.getByText("캔들 데이터가 없습니다.")).toBeTruthy();
+  });
+
+  it("shows safe candle errors without replacing other widgets", async () => {
+    await renderMarketPage();
+    const search = screen.getByRole("combobox");
+    fireEvent.change(search, { target: { value: "err1" } });
+    fireEvent.click(screen.getByRole("option"));
+
+    expect(screen.getByText("캔들 데이터를 불러오지 못했습니다.")).toBeTruthy();
+    expect(screen.getByTestId("last-price").textContent).toBe("123.45 XTS");
+    expect(document.body.textContent).toContain(
+      "호가를 불러오지 못했습니다.",
+    );
+    expect(document.body.textContent).not.toContain("Mock candle lookup failed.");
+    expect(document.body.textContent).not.toContain("mock-candle-request");
+  });
+
   it("renders the empty stock-list state without search or stale cards", () => {
     render(
       <MarketScreen
@@ -273,10 +392,12 @@ describe("market screen", () => {
         warnings={[]}
         orderbooks={[]}
         trades={[]}
+        candleSeries={[]}
         priceErrors={[]}
         warningErrors={[]}
         orderbookErrors={[]}
         tradeErrors={[]}
+        candleErrors={[]}
       />,
     );
 

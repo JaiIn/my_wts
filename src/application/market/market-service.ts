@@ -1,4 +1,6 @@
 import type {
+  CandleInterval,
+  MarketCandlePage,
   MarketOrderbook,
   MarketPrice,
   MarketStock,
@@ -13,6 +15,24 @@ export interface MarketService {
   getWarnings(symbol: string): Promise<readonly MarketWarning[]>;
   getOrderbook(symbol: string): Promise<MarketOrderbook>;
   getTrades(symbol: string, count?: number): Promise<readonly MarketTrade[]>;
+  getCandles(input: {
+    symbol: string;
+    interval: CandleInterval;
+    count?: number;
+    before?: string;
+    adjusted?: boolean;
+  }): Promise<MarketCandlePage>;
+}
+
+export class MarketDataInvalidCursorError extends Error {
+  readonly code = "VALIDATION_FAILED";
+  readonly status = 400;
+  readonly retryable = false;
+
+  constructor() {
+    super("INVALID_CANDLE_CURSOR");
+    this.name = "MarketDataInvalidCursorError";
+  }
 }
 
 export class MarketDataNotFoundError extends Error {

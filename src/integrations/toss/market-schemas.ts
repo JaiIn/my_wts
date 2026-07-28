@@ -73,6 +73,21 @@ export const tossTradeSchema = z.looseObject({
   currency: forwardCompatibleEnumSchema,
 });
 
+export const tossCandleSchema = z.looseObject({
+  timestamp: z.iso.datetime({ offset: true }),
+  openPrice: nonNegativeDecimalSchema,
+  highPrice: nonNegativeDecimalSchema,
+  lowPrice: nonNegativeDecimalSchema,
+  closePrice: nonNegativeDecimalSchema,
+  volume: nonNegativeDecimalSchema,
+  currency: forwardCompatibleEnumSchema,
+});
+
+export const tossCandlePageResponseSchema = z.looseObject({
+  candles: z.array(tossCandleSchema),
+  nextBefore: z.iso.datetime({ offset: true }).nullable().optional(),
+});
+
 export const tossStockInfoListSchema = z.array(tossStockInfoSchema);
 export const tossPriceResponseListSchema = z.array(tossPriceResponseSchema);
 export const tossStockWarningListSchema = z.array(tossStockWarningSchema);
@@ -85,3 +100,7 @@ export type TossOrderbookResponse = z.infer<
   typeof tossOrderbookResponseSchema
 >;
 export type TossTrade = z.infer<typeof tossTradeSchema>;
+export type TossCandle = z.infer<typeof tossCandleSchema>;
+export type TossCandlePageResponse = z.infer<
+  typeof tossCandlePageResponseSchema
+>;

@@ -3,6 +3,8 @@
 import { useId, useMemo, useState, type KeyboardEvent } from "react";
 
 import type {
+  MarketCandlePageView,
+  MarketCandleView,
   MarketOrderbookView,
   MarketPriceView,
   MarketScreenData,
@@ -11,6 +13,9 @@ import type {
   MarketTradeView,
   MarketWarningView,
 } from "../../application/market/market-screen";
+import { buildCandleChartView } from "../../application/market/candle-chart";
+import type { CandleInterval } from "../../domain/market/market";
+import { CandleChart } from "./candle-chart";
 import { searchMarketStocks } from "./market-search";
 
 function formatDecimalString(value: string): string {
@@ -425,7 +430,237 @@ function TradesWidget({
   );
 }
 
+function CandleWidget({
+  error,
+  interval,
+  onIntervalChange,
+  onNextPage,
+  pages,
+  stock,
+  visiblePageCount,
+}: {
+  error?: MarketScreenErrorView;
+  interval: CandleInterval;
+  onIntervalChange: (interval: CandleInterval) => void;
+  onNextPage: () => void;
+  pages: readonly MarketCandlePageView[];
+  stock?: MarketStockView;
+  visiblePageCount: number;
+}) {
+  const candles = useMemo(() => {
+    const byTimestamp = new Map<string, MarketCandleView>();
+    for (const page of pages.slice(0, visiblePageCount)) {
+      for (const candle of page.candles) {
+        if (!byTimestamp.has(candle.timestamp)) {
+          byTimestamp.set(candle.timestamp, candle);
+        }
+      }
+    }
+    return [...byTimestamp.values()].sort(
+      (left, right) =>
+        Date.parse(right.timestamp) - Date.parse(left.timestamp),
+    );
+  }, [pages, visiblePageCount]);
+  const chartView = useMemo(() => buildCandleChartView(candles), [candles]);
+  const directionByTimestamp = new Map(
+    chartView.points.map(({ direction, timestamp }) => [timestamp, direction]),
+  );
+  const hasNextPage = visiblePageCount < pages.length;
+
+  return (
+    <section
+      aria-labelledby="candle-title"
+      className="min-w-0 rounded-3xl border border-slate-200 bg-white p-6 shadow-sm"
+    >
+      <div className="flex flex-wrap items-start justify-between gap-4">
+        <div>
+          <h2 id="candle-title" className="text-lg font-semibold">
+            캔들 차트
+          </h2>
+          <p className="mt-1 text-sm text-slate-600">
+            {stock ? `${stock.symbol} · ${stock.displayName}` : "선택 종목 없음"}
+          </p>
+        </div>
+        <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-700">
+          MOCK · 비실시간
+        </span>
+      </div>
+
+      <fieldset className="mt-5">
+        <legend className="text-sm font-medium text-slate-700">캔들 주기</legend>
+        <div className="mt-2 flex gap-2">
+          {(["1d", "1m"] as const).map((candidate) => (
+            <button
+              key={candidate}
+              type="button"
+              aria-pressed={interval === candidate}
+              className={`rounded-lg border px-4 py-2 text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-blue-600 ${
+                interval === candidate
+                  ? "border-blue-700 bg-blue-700 text-white"
+                  : "border-slate-300 bg-white text-slate-800"
+              }`}
+              onClick={() => onIntervalChange(candidate)}
+            >
+              {candidate === "1d" ? "일봉" : "1분봉"}
+            </button>
+          ))}
+        </div>
+      </fieldset>
+
+      {error ? (
+        <div className="mt-5">
+          <InlineError error={error} />
+        </div>
+      ) : !stock || candles.length === 0 ? (
+        <div role="status" className="mt-5">
+          <h3 className="font-medium">캔들 데이터가 없습니다.</h3>
+          <p className="mt-1 text-sm text-slate-600">
+            선택한 종목과 주기의 캔들 데이터가 제공되지 않습니다.
+          </p>
+        </div>
+      ) : (
+        <>
+          <div
+            aria-label="캔들 방향 범례"
+            className="mt-5 flex flex-wrap gap-4 text-sm"
+          >
+            <span>
+              <span aria-hidden="true" className="text-emerald-700">
+                ■
+              </span>{" "}
+              상승: 종가가 시가보다 높음
+            </span>
+            <span>
+              <span aria-hidden="true" className="text-red-700">
+                ■
+              </span>{" "}
+              하락: 종가가 시가보다 낮음
+            </span>
+            <span>
+              <span aria-hidden="true" className="text-slate-500">
+                ■
+              </span>{" "}
+              보합: 종가와 시가가 같음
+            </span>
+          </div>
+
+          <div className="mt-4 overflow-x-auto">
+            <CandleChart candles={candles} />
+          </div>
+
+          <dl className="mt-4 grid gap-3 text-sm sm:grid-cols-3">
+            <div>
+              <dt className="text-slate-500">표시 캔들</dt>
+              <dd data-testid="candle-count" className="font-semibold">
+                {candles.length}개
+              </dd>
+            </div>
+            <div>
+              <dt className="text-slate-500">최저가</dt>
+              <dd className="font-mono font-semibold">
+                {chartView.minimumPrice} {candles[0]?.currency}
+              </dd>
+            </div>
+            <div>
+              <dt className="text-slate-500">최고가</dt>
+              <dd className="font-mono font-semibold">
+                {chartView.maximumPrice} {candles[0]?.currency}
+              </dd>
+            </div>
+          </dl>
+
+          <div className="mt-5 overflow-x-auto">
+            <table className="w-full min-w-[68rem] border-collapse text-sm">
+              <caption className="sr-only">
+                {stock.displayName} {interval} 캔들 원본 데이터
+              </caption>
+              <thead>
+                <tr className="border-b border-slate-200 text-left text-slate-600">
+                  {[
+                    "시각",
+                    "방향",
+                    "시가",
+                    "고가",
+                    "저가",
+                    "종가",
+                    "거래량",
+                  ].map((heading) => (
+                    <th key={heading} scope="col" className="px-3 py-2">
+                      {heading}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {candles.map((candle) => {
+                  const direction = directionByTimestamp.get(candle.timestamp);
+                  return (
+                    <tr
+                      key={candle.timestamp}
+                      className="border-b border-slate-100"
+                    >
+                      <th scope="row" className="px-3 py-2 font-medium">
+                        <time dateTime={candle.timestamp}>
+                          {candle.timestamp}
+                        </time>
+                      </th>
+                      <td className="px-3 py-2">
+                        {direction === "rising"
+                          ? "상승"
+                          : direction === "falling"
+                            ? "하락"
+                            : "보합"}
+                      </td>
+                      {[
+                        candle.openPrice,
+                        candle.highPrice,
+                        candle.lowPrice,
+                        candle.closePrice,
+                      ].map((value, index) => (
+                        <td
+                          key={`${candle.timestamp}-price-${index}`}
+                          className="px-3 py-2 font-mono"
+                        >
+                          {formatDecimalString(value)} {candle.currency}
+                        </td>
+                      ))}
+                      <td className="px-3 py-2 font-mono">
+                        {formatDecimalString(candle.volume)}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+
+          <div className="mt-5 flex flex-wrap items-center gap-3">
+            {hasNextPage ? (
+              <button
+                type="button"
+                className="rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-blue-600"
+                onClick={onNextPage}
+              >
+                이전 캔들 더 보기
+              </button>
+            ) : (
+              <p role="status" className="text-sm text-slate-600">
+                마지막 페이지입니다.
+              </p>
+            )}
+            <p className="text-xs text-slate-500">
+              Cursor는 mock service가 제공한 값을 그대로 사용합니다.
+            </p>
+          </div>
+        </>
+      )}
+    </section>
+  );
+}
+
 export function MarketScreen({
+  candleErrors,
+  candleSeries,
   initialSymbol,
   orderbookErrors,
   orderbooks,
@@ -442,6 +677,9 @@ export function MarketScreen({
   const listboxId = useId();
   const [query, setQuery] = useState("");
   const [selectedSymbol, setSelectedSymbol] = useState(initialSymbol);
+  const [candleInterval, setCandleInterval] =
+    useState<CandleInterval>("1d");
+  const [visibleCandlePages, setVisibleCandlePages] = useState(1);
   const [activeIndex, setActiveIndex] = useState(-1);
   const results = useMemo(
     () => searchMarketStocks(stocks, query),
@@ -472,6 +710,14 @@ export function MarketScreen({
   const selectedTradeError = tradeErrors.find(
     ({ symbol }) => symbol === selectedSymbol,
   )?.error;
+  const selectedCandleSeries = candleSeries.find(
+    ({ interval, symbol }) =>
+      symbol === selectedSymbol && interval === candleInterval,
+  );
+  const selectedCandleError = candleErrors.find(
+    ({ interval, symbol }) =>
+      symbol === selectedSymbol && interval === candleInterval,
+  )?.error;
   const listboxOpen = results.length > 0;
 
   function selectStock(stock: MarketStockView) {
@@ -479,6 +725,8 @@ export function MarketScreen({
       return;
     }
     setSelectedSymbol(stock.symbol);
+    setCandleInterval("1d");
+    setVisibleCandlePages(1);
     setQuery("");
     setActiveIndex(-1);
   }
@@ -640,6 +888,25 @@ export function MarketScreen({
                     trades={selectedTrades}
                   />
                 </div>
+                <CandleWidget
+                  error={selectedCandleError}
+                  interval={candleInterval}
+                  onIntervalChange={(interval) => {
+                    setCandleInterval(interval);
+                    setVisibleCandlePages(1);
+                  }}
+                  onNextPage={() =>
+                    setVisibleCandlePages((current) =>
+                      Math.min(
+                        current + 1,
+                        selectedCandleSeries?.pages.length ?? 1,
+                      ),
+                    )
+                  }
+                  pages={selectedCandleSeries?.pages ?? []}
+                  stock={selectedStock}
+                  visiblePageCount={visibleCandlePages}
+                />
               </>
             ) : null}
           </>

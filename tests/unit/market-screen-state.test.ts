@@ -31,6 +31,10 @@ function emptyService(overrides: Partial<MarketService> = {}): MarketService {
       throw new MarketDataNotFoundError();
     },
     getTrades: async () => [],
+    getCandles: async () => ({
+      candles: [],
+      nextBefore: null,
+    }),
     ...overrides,
   };
 }
@@ -48,6 +52,10 @@ describe("market screen safe states", () => {
         "market",
       ),
       safeMarketScreenError(
+        new MarketDataSourceError("UPSTREAM_UNAVAILABLE", true),
+        "candles",
+      ),
+      safeMarketScreenError(
         new Error("C:\\private\\data.sqlite3 SQL stack secret-body"),
         "market",
       ),
@@ -58,6 +66,7 @@ describe("market screen safe states", () => {
       "not-found",
       "unavailable",
       "invalid-data",
+      "unavailable",
       "unexpected",
     ]);
     expect(serialized).not.toContain("private");
