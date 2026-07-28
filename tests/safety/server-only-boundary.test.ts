@@ -11,6 +11,7 @@ describe("server-only boundary", () => {
     for (const path of [
       "src/infrastructure/config/server-environment.ts",
       "src/infrastructure/logging/server-logger.ts",
+      "src/infrastructure/toss/token-manager.ts",
     ]) {
       expect(readFileSync(resolve(projectRoot, path), "utf8")).toMatch(
         /^import "server-only";/m,
@@ -39,5 +40,18 @@ describe("server-only boundary", () => {
     expect(clientSources.join("\n")).not.toMatch(
       /server-environment|server-logger|TOSS_CLIENT|process\.env/,
     );
+  });
+
+  it("keeps OAuth tokens in process memory and behind the injected transport", () => {
+    const tokenManagerSource = readFileSync(
+      resolve(projectRoot, "src/infrastructure/toss/token-manager.ts"),
+      "utf8",
+    );
+
+    expect(tokenManagerSource).not.toMatch(
+      /\b(fetch|localStorage|sessionStorage|writeFile|sqlite|database)\b/,
+    );
+    expect(tokenManagerSource).toMatch(/OAuthTransport/);
+    expect(tokenManagerSource).toMatch(/withAccessToken/);
   });
 });
