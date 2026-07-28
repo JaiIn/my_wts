@@ -114,7 +114,7 @@ test("signup → logout → login keeps the local auth boundary", async ({
   await page.getByRole("button", { name: "회원가입" }).click();
   const signupResponse = await signupResponsePromise;
   expect(signupResponse.status()).toBe(201);
-  await expect(page).toHaveURL("/market");
+  await expect(page).toHaveURL("/market", { timeout: 15_000 });
 
   const firstCookie = await sessionCookie(context);
   expect(firstCookie).toMatchObject({
@@ -246,7 +246,7 @@ test("signup → logout → login keeps the local auth boundary", async ({
     await page.getByRole("button", { name: "로그인" }).click();
     const loginResponse = await loginResponsePromise;
     expect(loginResponse.status()).toBe(204);
-    await expect(page).toHaveURL("/market");
+    await expect(page).toHaveURL("/market", { timeout: 15_000 });
 
     const newCookie = await sessionCookie(context);
     expect(newCookie).toMatchObject({

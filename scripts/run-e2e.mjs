@@ -9,6 +9,14 @@ mkdirSync(runtimeParent, { recursive: true });
 const runtimeDirectory = mkdtempSync(join(runtimeParent, "e2e-runtime-"));
 const databaseDirectory = mkdtempSync(join(tmpdir(), "my-wts-e2e-db-"));
 const databasePath = join(databaseDirectory, "my_wts.sqlite3");
+const playwrightArguments = process.argv
+  .slice(2)
+  .filter((value) => value !== "--");
+const playwrightOutputDirectory = resolve(
+  projectRoot,
+  "test-results",
+  "playwright",
+);
 
 const runtimeEntries = [
   "app",
@@ -36,7 +44,11 @@ try {
 
   const result = spawnSync(
     process.execPath,
-    [resolve(projectRoot, "node_modules/@playwright/test/cli.js"), "test"],
+    [
+      resolve(projectRoot, "node_modules/@playwright/test/cli.js"),
+      "test",
+      ...playwrightArguments,
+    ],
     {
       cwd: projectRoot,
       env: {
@@ -58,6 +70,7 @@ try {
 } finally {
   rmSync(runtimeDirectory, { force: true, recursive: true });
   rmSync(databaseDirectory, { force: true, recursive: true });
+  rmSync(playwrightOutputDirectory, { force: true, recursive: true });
 }
 
 process.exit(exitCode);
