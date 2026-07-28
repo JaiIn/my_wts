@@ -12,6 +12,7 @@ describe("server-only boundary", () => {
       "src/infrastructure/config/server-environment.ts",
       "src/infrastructure/logging/server-logger.ts",
       "src/infrastructure/toss/token-manager.ts",
+      "src/infrastructure/toss/readonly-http-client.ts",
     ]) {
       expect(readFileSync(resolve(projectRoot, path), "utf8")).toMatch(
         /^import "server-only";/m,
@@ -53,5 +54,21 @@ describe("server-only boundary", () => {
     );
     expect(tokenManagerSource).toMatch(/OAuthTransport/);
     expect(tokenManagerSource).toMatch(/withAccessToken/);
+  });
+
+  it("keeps the readonly Toss client server-only, transport-injected, and mutation-free", () => {
+    const clientSource = readFileSync(
+      resolve(projectRoot, "src/infrastructure/toss/readonly-http-client.ts"),
+      "utf8",
+    );
+
+    expect(clientSource).not.toMatch(
+      /\b(fetch|https?\.request|localStorage|sessionStorage|writeFile|sqlite|database)\b/,
+    );
+    expect(clientSource).not.toMatch(
+      /createOrder|modifyOrder|cancelOrder|createConditionalOrder|modifyConditionalOrder|cancelConditionalOrder/,
+    );
+    expect(clientSource).toMatch(/method: "GET"/);
+    expect(clientSource).toMatch(/TossHttpTransport/);
   });
 });

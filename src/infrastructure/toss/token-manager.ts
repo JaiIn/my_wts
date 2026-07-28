@@ -53,7 +53,7 @@ export type TokenManager = Readonly<{
   withAccessToken<T>(
     consumer: (accessToken: string) => T | Promise<T>,
   ): Promise<T>;
-  invalidate(): void;
+  invalidate(expectedAccessToken?: string): void;
 }>;
 
 type CachedToken = Readonly<{
@@ -175,8 +175,13 @@ export function createTokenManager(options: TokenManagerOptions): TokenManager {
     ): Promise<T> {
       return consumer((await getToken()).accessToken);
     },
-    invalidate() {
-      cachedToken = undefined;
+    invalidate(expectedAccessToken) {
+      if (
+        expectedAccessToken === undefined ||
+        cachedToken?.accessToken === expectedAccessToken
+      ) {
+        cachedToken = undefined;
+      }
     },
   });
 }

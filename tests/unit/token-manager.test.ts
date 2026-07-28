@@ -85,6 +85,27 @@ describe("server-only TokenManager", () => {
     );
   });
 
+  it("does not invalidate a newer cached token when an older request reports 401", async () => {
+    const issueToken = vi
+      .fn<OAuthTransport["issueToken"]>()
+      .mockResolvedValueOnce(success(TOKEN_ONE))
+      .mockResolvedValueOnce(success(TOKEN_TWO));
+    const manager = createTokenManager({
+      environment: liveEnvironment(),
+      transport: { issueToken },
+      clock: () => 0,
+    });
+
+    await manager.withAccessToken(() => undefined);
+    manager.invalidate(TOKEN_ONE);
+    await manager.withAccessToken(() => undefined);
+    manager.invalidate(TOKEN_ONE);
+    await expect(manager.withAccessToken((token) => token)).resolves.toBe(
+      TOKEN_TWO,
+    );
+    expect(issueToken).toHaveBeenCalledTimes(2);
+  });
+
   it("single-flights concurrent requests and gives every waiter the same token", async () => {
     let resolveResponse!: (value: ReturnType<typeof success>) => void;
     const issueToken = vi.fn(
