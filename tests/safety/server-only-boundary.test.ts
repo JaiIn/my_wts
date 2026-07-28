@@ -18,6 +18,8 @@ describe("server-only boundary", () => {
       "src/infrastructure/market/live-market-detail-provider.ts",
       "src/infrastructure/market/runtime-stock-price-provider.ts",
       "src/infrastructure/market/runtime-market-detail-provider.ts",
+      "src/infrastructure/market/live-market-reference-provider.ts",
+      "src/infrastructure/market/runtime-market-reference-provider.ts",
       "src/infrastructure/market/runtime-market-bff.ts",
     ]) {
       expect(readFileSync(resolve(projectRoot, path), "utf8")).toMatch(
@@ -84,12 +86,17 @@ describe("server-only boundary", () => {
       "src/infrastructure/market/live-market-detail-provider.ts",
       "src/infrastructure/market/runtime-stock-price-provider.ts",
       "src/infrastructure/market/runtime-market-detail-provider.ts",
+      "src/infrastructure/market/live-market-reference-provider.ts",
+      "src/infrastructure/market/runtime-market-reference-provider.ts",
       "src/infrastructure/toss/runtime-readonly-client.ts",
       "app/api/v1/market/stocks/route.ts",
       "app/api/v1/market/prices/route.ts",
       "app/api/v1/market/stocks/[symbol]/warnings/route.ts",
       "app/api/v1/market/orderbook/route.ts",
       "app/api/v1/market/trades/route.ts",
+      "app/api/v1/market/candles/route.ts",
+      "app/api/v1/market/calendars/[country]/route.ts",
+      "app/api/v1/market/exchange-rate/route.ts",
     ]
       .map((path) => readFileSync(resolve(projectRoot, path), "utf8"))
       .join("\n");
@@ -102,8 +109,9 @@ describe("server-only boundary", () => {
     expect(sources).toContain("/api/v1/orderbook");
     expect(sources).toContain("/api/v1/trades");
     expect(sources).toContain("/warnings");
-    expect(sources).not.toMatch(
-      /\/api\/v1\/(?:candles|exchange-rate|market-calendar)/,
-    );
+    expect(sources).toContain("/api/v1/candles");
+    expect(sources).toContain("/api/v1/exchange-rate");
+    expect(sources).toContain("/api/v1/market-calendar/KR");
+    expect(sources).toContain("/api/v1/market-calendar/US");
   });
 });
