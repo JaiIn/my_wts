@@ -6,8 +6,12 @@ import {
 } from "../../application/market/market-service";
 import type {
   CandleInterval,
+  ExchangeRate,
   MarketCandle,
   MarketCandlePage,
+  MarketCalendar,
+  MarketCountry,
+  MarketDay,
   MarketOrderbook,
   MarketOrderbookLevel,
   MarketPrice,
@@ -22,17 +26,23 @@ import {
 } from "../../integrations/toss/envelope";
 import {
   tossCandlePageResponseSchema,
+  tossExchangeRateResponseSchema,
+  tossKrMarketCalendarResponseSchema,
   tossOrderbookResponseSchema,
   tossPriceResponseListSchema,
   tossStockInfoListSchema,
   tossStockWarningListSchema,
   tossTradeListSchema,
+  tossUsMarketCalendarResponseSchema,
   type TossCandle,
+  type TossExchangeRateResponse,
+  type TossKrMarketCalendarResponse,
   type TossOrderbookResponse,
   type TossPriceResponse,
   type TossStockInfo,
   type TossStockWarning,
   type TossTrade,
+  type TossUsMarketCalendarResponse,
 } from "../../integrations/toss/market-schemas";
 import {
   MOCK_CANDLE_ERROR_TOSS_ENVELOPES,
@@ -43,6 +53,11 @@ import {
   MOCK_TRADES_TOSS_ENVELOPES,
   MOCK_WARNINGS_TOSS_ENVELOPES,
 } from "./mock-market-fixtures";
+import {
+  MOCK_EXCHANGE_RATE_TOSS_ENVELOPE,
+  MOCK_KR_CALENDAR_TOSS_ENVELOPE,
+  MOCK_US_CALENDAR_TOSS_ENVELOPE,
+} from "./mock-reference-fixtures";
 import type { z } from "zod";
 
 export type MockMarketFixtureSet = {
@@ -57,6 +72,8 @@ export type MockMarketFixtureSet = {
     candles: readonly unknown[];
   }[];
   candleErrorEnvelopes?: Readonly<Record<string, unknown>>;
+  calendarEnvelopes?: Readonly<Partial<Record<MarketCountry, unknown>>>;
+  exchangeRateEnvelopes?: Readonly<Record<string, unknown>>;
 };
 
 function compareSymbols(left: string, right: string): number {
@@ -251,6 +268,111 @@ function candleKey(symbol: string, interval: CandleInterval): string {
   return `${symbol}:${interval}`;
 }
 
+type CalendarDayDto =
+  TossKrMarketCalendarResponse["today"] | TossUsMarketCalendarResponse["today"];
+
+function toMarketDay(day: CalendarDayDto, country: MarketCountry): MarketDay {
+  const integrated =
+    "integrated" in day
+      ? (day.integrated as
+          | {
+              preMarket?: { startTime: string; endTime: string } | null;
+              regularMarket?: { startTime: string; endTime: string } | null;
+              afterMarket?: { startTime: string; endTime: string } | null;
+            }
+          | null
+          | undefined)
+      : undefined;
+  const sessions =
+    country === "KR"
+      ? [
+          ["pre", integrated?.preMarket],
+          ["regular", integrated?.regularMarket],
+          ["after", integrated?.afterMarket],
+        ]
+      : [
+          ["day", "dayMarket" in day ? day.dayMarket : null],
+          ["pre", "preMarket" in day ? day.preMarket : null],
+          ["regular", "regularMarket" in day ? day.regularMarket : null],
+          ["after", "afterMarket" in day ? day.afterMarket : null],
+        ];
+
+  return {
+    date: day.date,
+    sessions: sessions.flatMap(([kind, session]) => {
+      const typedSession = session as
+        { startTime: string; endTime: string } | null | undefined;
+      return typedSession
+        ? [
+            {
+              kind: kind as MarketDay["sessions"][number]["kind"],
+              startTime: typedSession.startTime,
+              endTime: typedSession.endTime,
+            },
+          ]
+        : [];
+    }),
+  };
+}
+
+function assertCalendarContract(calendar: MarketCalendar, date: string): void {
+  const days = [
+    calendar.previousBusinessDay,
+    calendar.today,
+    calendar.nextBusinessDay,
+  ];
+  if (
+    calendar.today.date !== date ||
+    !(days[0]!.date < days[1]!.date && days[1]!.date < days[2]!.date) ||
+    new Set(days.map(({ date: day }) => day)).size !== days.length
+  ) {
+    throw new TossEnvelopeDecodeError("INVALID_RESULT");
+  }
+
+  for (const day of days) {
+    let previousEnd = Number.NEGATIVE_INFINITY;
+    for (const session of day.sessions) {
+      const start = Date.parse(session.startTime);
+      const end = Date.parse(session.endTime);
+      if (!Number.isFinite(start) || start >= end || start < previousEnd) {
+        throw new TossEnvelopeDecodeError("INVALID_RESULT");
+      }
+      previousEnd = end;
+    }
+  }
+}
+
+function toMarketCalendar(
+  country: MarketCountry,
+  value: TossKrMarketCalendarResponse | TossUsMarketCalendarResponse,
+): MarketCalendar {
+  return {
+    country,
+    marketTimeZone: country === "KR" ? "Asia/Seoul" : "America/New_York",
+    displayTimeZone: "Asia/Seoul",
+    today: toMarketDay(value.today, country),
+    previousBusinessDay: toMarketDay(value.previousBusinessDay, country),
+    nextBusinessDay: toMarketDay(value.nextBusinessDay, country),
+  };
+}
+
+function toExchangeRate(value: TossExchangeRateResponse): ExchangeRate {
+  return {
+    baseCurrency: value.baseCurrency,
+    quoteCurrency: value.quoteCurrency,
+    rate: value.rate,
+    midRate: value.midRate,
+    basisPoint: value.basisPoint,
+    rateChangeType: value.rateChangeType,
+    validFrom: value.validFrom,
+    validUntil: value.validUntil,
+  };
+}
+
+function exchangeRateKey(baseCurrency: string, quoteCurrency: string): string {
+  return `${baseCurrency}:${quoteCurrency}`;
+}
+
 function decodeFixture<T>(envelope: unknown, schema: z.ZodType<T[]>): T[] {
   const decoded = decodeTossEnvelope(envelope, schema);
   if (!decoded.ok) {
@@ -281,10 +403,20 @@ export function createMockMarketService(
     fixtures.orderbookEnvelopes ?? MOCK_ORDERBOOK_TOSS_ENVELOPES;
   const tradesEnvelopes: Readonly<Record<string, unknown>> =
     fixtures.tradesEnvelopes ?? MOCK_TRADES_TOSS_ENVELOPES;
-  const candleDatasets =
-    fixtures.candleDatasets ?? MOCK_CANDLE_TOSS_DATASETS;
+  const candleDatasets = fixtures.candleDatasets ?? MOCK_CANDLE_TOSS_DATASETS;
   const candleErrorEnvelopes: Readonly<Record<string, unknown>> =
     fixtures.candleErrorEnvelopes ?? MOCK_CANDLE_ERROR_TOSS_ENVELOPES;
+  const calendarEnvelopes =
+    fixtures.calendarEnvelopes ??
+    ({
+      KR: MOCK_KR_CALENDAR_TOSS_ENVELOPE,
+      US: MOCK_US_CALENDAR_TOSS_ENVELOPE,
+    } satisfies Partial<Record<MarketCountry, unknown>>);
+  const exchangeRateEnvelopes =
+    fixtures.exchangeRateEnvelopes ??
+    ({
+      "USD:KRW": MOCK_EXCHANGE_RATE_TOSS_ENVELOPE,
+    } satisfies Record<string, unknown>);
 
   const stocksBySymbol = new Map(stocks.map((stock) => [stock.symbol, stock]));
   const pricesBySymbol = new Map(prices.map((price) => [price.symbol, price]));
@@ -345,10 +477,7 @@ export function createMockMarketService(
       if (envelope === undefined) {
         throw new MarketDataNotFoundError();
       }
-      const decoded = decodeTossEnvelope(
-        envelope,
-        tossOrderbookResponseSchema,
-      );
+      const decoded = decodeTossEnvelope(envelope, tossOrderbookResponseSchema);
       if (!decoded.ok) {
         throw marketSourceError(decoded.error.code);
       }
@@ -457,6 +586,62 @@ export function createMockMarketService(
       };
       assertCandleContract(page.candles);
       return structuredClone(page);
+    },
+
+    async getMarketCalendar({ country, date }) {
+      if (
+        !["KR", "US"].includes(country) ||
+        !/^\d{4}-\d{2}-\d{2}$/.test(date)
+      ) {
+        throw new RangeError("INVALID_MARKET_CALENDAR_REQUEST");
+      }
+      const envelope = calendarEnvelopes[country];
+      if (envelope === undefined) {
+        throw new MarketDataNotFoundError();
+      }
+      const schema =
+        country === "KR"
+          ? tossKrMarketCalendarResponseSchema
+          : tossUsMarketCalendarResponseSchema;
+      const decoded = decodeTossEnvelope(envelope, schema);
+      if (!decoded.ok) {
+        throw marketSourceError(decoded.error.code);
+      }
+      const calendar = toMarketCalendar(country, decoded.result);
+      assertCalendarContract(calendar, date);
+      return structuredClone(calendar);
+    },
+
+    async getExchangeRate({ baseCurrency, quoteCurrency, dateTime }) {
+      if (
+        baseCurrency === quoteCurrency ||
+        !["KRW", "USD"].includes(baseCurrency) ||
+        !["KRW", "USD"].includes(quoteCurrency) ||
+        (dateTime !== undefined && !Number.isFinite(Date.parse(dateTime)))
+      ) {
+        throw new MarketDataNotFoundError();
+      }
+      const envelope =
+        exchangeRateEnvelopes[exchangeRateKey(baseCurrency, quoteCurrency)];
+      if (envelope === undefined) {
+        throw new MarketDataNotFoundError();
+      }
+      const decoded = decodeTossEnvelope(
+        envelope,
+        tossExchangeRateResponseSchema,
+      );
+      if (!decoded.ok) {
+        throw marketSourceError(decoded.error.code);
+      }
+      const rate = toExchangeRate(decoded.result);
+      if (
+        rate.baseCurrency !== baseCurrency ||
+        rate.quoteCurrency !== quoteCurrency ||
+        Date.parse(rate.validFrom) >= Date.parse(rate.validUntil)
+      ) {
+        throw new TossEnvelopeDecodeError("INVALID_RESULT");
+      }
+      return structuredClone(rate);
     },
   };
 }

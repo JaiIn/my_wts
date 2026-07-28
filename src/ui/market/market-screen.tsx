@@ -5,6 +5,8 @@ import { useId, useMemo, useState, type KeyboardEvent } from "react";
 import type {
   MarketCandlePageView,
   MarketCandleView,
+  ExchangeRateView,
+  MarketCalendarView,
   MarketOrderbookView,
   MarketPriceView,
   MarketScreenData,
@@ -27,6 +29,184 @@ function formatDecimalString(value: string): string {
   const [, sign, integer, fraction = "", exponent = ""] = match;
   const groupedInteger = integer.replace(/\B(?=(\d{3})+(?!\d))/g, ",");
   return `${sign}${groupedInteger}${fraction}${exponent}`;
+}
+
+const sessionLabels = {
+  day: "데이마켓",
+  pre: "프리마켓",
+  regular: "정규장",
+  after: "애프터마켓",
+} as const;
+
+const statusLabels = {
+  day: "데이마켓 운영 중",
+  pre: "프리마켓 운영 중",
+  regular: "정규장 운영 중",
+  after: "애프터마켓 운영 중",
+  closed: "현재 운영 세션 없음",
+} as const;
+
+function formatMarketTime(value: string, timeZone: string): string {
+  return new Intl.DateTimeFormat("ko-KR", {
+    dateStyle: "medium",
+    timeStyle: "short",
+    timeZone,
+  }).format(new Date(value));
+}
+
+function CalendarWidget({
+  calendar,
+  error,
+  stock,
+}: {
+  calendar?: MarketCalendarView;
+  error?: MarketScreenErrorView;
+  stock?: MarketStockView;
+}) {
+  return (
+    <section
+      aria-labelledby="market-calendar-title"
+      className="min-w-0 rounded-3xl border border-slate-200 bg-white p-6 shadow-sm"
+    >
+      <h2 id="market-calendar-title" className="text-lg font-semibold">
+        장 운영 상태
+      </h2>
+      <p className="mt-1 text-sm text-slate-600">
+        {stock ? `장 캘린더 · ${stock.symbol}` : "선택 종목 없음"}
+      </p>
+      {error ? (
+        <div className="mt-5">
+          <InlineError error={error} />
+        </div>
+      ) : !calendar ? (
+        <div role="status" className="mt-5">
+          장 캘린더가 비어 있습니다.
+        </div>
+      ) : (
+        <div className="mt-5">
+          <p role="status" className="font-semibold text-blue-800">
+            {statusLabels[calendar.status]}
+          </p>
+          <p className="mt-1 text-xs leading-5 text-slate-600">
+            이 상태는 주문 가능 여부를 보장하지 않습니다.
+          </p>
+          <dl className="mt-4 grid gap-3 text-sm">
+            <div>
+              <dt className="text-slate-500">시장 기준일</dt>
+              <dd className="font-medium">{calendar.date}</dd>
+            </div>
+            <div>
+              <dt className="text-slate-500">시간대</dt>
+              <dd className="font-medium">
+                {calendar.displayTimeZone}
+                {calendar.marketTimeZone !== calendar.displayTimeZone
+                  ? ` · 현지 기준일 ${calendar.marketTimeZone}`
+                  : ""}
+              </dd>
+            </div>
+            <div>
+              <dt className="text-slate-500">인접 영업일</dt>
+              <dd className="font-medium">
+                {calendar.previousBusinessDay} · {calendar.nextBusinessDay}
+              </dd>
+            </div>
+          </dl>
+          {calendar.sessions.length === 0 ? (
+            <p role="status" className="mt-4 text-sm text-slate-600">
+              휴장일이며 운영 세션이 없습니다.
+            </p>
+          ) : (
+            <ul aria-label="장 세션" className="mt-4 grid gap-2 text-sm">
+              {calendar.sessions.map((session) => (
+                <li
+                  key={session.kind}
+                  className="rounded-xl bg-slate-50 px-3 py-2"
+                >
+                  <span className="font-semibold">
+                    {sessionLabels[session.kind]}
+                  </span>
+                  <span className="mt-1 block text-slate-600">
+                    {formatMarketTime(
+                      session.startTime,
+                      calendar.displayTimeZone,
+                    )}{" "}
+                    ~{" "}
+                    {formatMarketTime(
+                      session.endTime,
+                      calendar.displayTimeZone,
+                    )}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          )}
+          <p className="mt-4 text-xs text-slate-500">
+            고정 mock 일정 · 비실시간
+          </p>
+        </div>
+      )}
+    </section>
+  );
+}
+
+function ExchangeRateWidget({
+  error,
+  rate,
+  stock,
+}: {
+  error?: MarketScreenErrorView;
+  rate?: ExchangeRateView;
+  stock?: MarketStockView;
+}) {
+  if (stock?.currency === "KRW" && !error) {
+    return null;
+  }
+  return (
+    <section
+      aria-labelledby="exchange-rate-title"
+      className="min-w-0 rounded-3xl border border-slate-200 bg-white p-6 shadow-sm"
+    >
+      <h2 id="exchange-rate-title" className="text-lg font-semibold">
+        참고 환율
+      </h2>
+      {error ? (
+        <div className="mt-5">
+          <InlineError error={error} />
+        </div>
+      ) : !rate ? (
+        <p role="status" className="mt-5 text-sm text-slate-600">
+          표시할 환율이 없습니다.
+        </p>
+      ) : (
+        <div className="mt-5">
+          <p className="text-sm text-slate-600">
+            1 {rate.baseCurrency} ={" "}
+            <strong data-testid="exchange-rate">
+              {formatDecimalString(rate.rate)} {rate.quoteCurrency}
+            </strong>
+          </p>
+          <dl className="mt-4 grid gap-3 text-sm">
+            <div>
+              <dt className="text-slate-500">통화쌍</dt>
+              <dd className="font-medium">
+                {rate.baseCurrency}/{rate.quoteCurrency}
+              </dd>
+            </div>
+            <div>
+              <dt className="text-slate-500">기준 시각</dt>
+              <dd className="font-medium">
+                {formatMarketTime(rate.validFrom, "Asia/Seoul")}
+              </dd>
+            </div>
+          </dl>
+          <p className="mt-4 text-xs leading-5 text-slate-500">
+            고정 mock 참고 환율 · 비실시간 · 실제 환전 또는 주문 적용 환율이
+            아닙니다.
+          </p>
+        </div>
+      )}
+    </section>
+  );
 }
 
 function MarketHeader() {
@@ -250,7 +430,9 @@ function OrderbookWidget({
             호가
           </h2>
           <p className="mt-1 text-sm text-slate-600">
-            {stock ? `${stock.symbol} · ${stock.displayName}` : "선택 종목 없음"}
+            {stock
+              ? `${stock.symbol} · ${stock.displayName}`
+              : "선택 종목 없음"}
           </p>
         </div>
         <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-700">
@@ -367,7 +549,9 @@ function TradesWidget({
             최근 체결
           </h2>
           <p className="mt-1 text-sm text-slate-600">
-            {stock ? `${stock.symbol} · ${stock.displayName}` : "선택 종목 없음"}
+            {stock
+              ? `${stock.symbol} · ${stock.displayName}`
+              : "선택 종목 없음"}
           </p>
         </div>
         <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-700">
@@ -457,8 +641,7 @@ function CandleWidget({
       }
     }
     return [...byTimestamp.values()].sort(
-      (left, right) =>
-        Date.parse(right.timestamp) - Date.parse(left.timestamp),
+      (left, right) => Date.parse(right.timestamp) - Date.parse(left.timestamp),
     );
   }, [pages, visiblePageCount]);
   const chartView = useMemo(() => buildCandleChartView(candles), [candles]);
@@ -478,7 +661,9 @@ function CandleWidget({
             캔들 차트
           </h2>
           <p className="mt-1 text-sm text-slate-600">
-            {stock ? `${stock.symbol} · ${stock.displayName}` : "선택 종목 없음"}
+            {stock
+              ? `${stock.symbol} · ${stock.displayName}`
+              : "선택 종목 없음"}
           </p>
         </div>
         <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-700">
@@ -487,7 +672,9 @@ function CandleWidget({
       </div>
 
       <fieldset className="mt-5">
-        <legend className="text-sm font-medium text-slate-700">캔들 주기</legend>
+        <legend className="text-sm font-medium text-slate-700">
+          캔들 주기
+        </legend>
         <div className="mt-2 flex gap-2">
           {(["1d", "1m"] as const).map((candidate) => (
             <button
@@ -659,8 +846,12 @@ function CandleWidget({
 }
 
 export function MarketScreen({
+  calendarErrors = [],
+  calendars = [],
   candleErrors,
   candleSeries,
+  exchangeRateErrors = [],
+  exchangeRates = [],
   initialSymbol,
   orderbookErrors,
   orderbooks,
@@ -677,8 +868,7 @@ export function MarketScreen({
   const listboxId = useId();
   const [query, setQuery] = useState("");
   const [selectedSymbol, setSelectedSymbol] = useState(initialSymbol);
-  const [candleInterval, setCandleInterval] =
-    useState<CandleInterval>("1d");
+  const [candleInterval, setCandleInterval] = useState<CandleInterval>("1d");
   const [visibleCandlePages, setVisibleCandlePages] = useState(1);
   const [activeIndex, setActiveIndex] = useState(-1);
   const results = useMemo(
@@ -717,6 +907,18 @@ export function MarketScreen({
   const selectedCandleError = candleErrors.find(
     ({ interval, symbol }) =>
       symbol === selectedSymbol && interval === candleInterval,
+  )?.error;
+  const selectedCalendar = calendars.find(
+    ({ symbol }) => symbol === selectedSymbol,
+  );
+  const selectedCalendarError = calendarErrors.find(
+    ({ symbol }) => symbol === selectedSymbol,
+  )?.error;
+  const selectedExchangeRate = exchangeRates.find(
+    ({ symbol }) => symbol === selectedSymbol,
+  );
+  const selectedExchangeRateError = exchangeRateErrors.find(
+    ({ symbol }) => symbol === selectedSymbol,
   )?.error;
   const listboxOpen = results.length > 0;
 
@@ -876,6 +1078,18 @@ export function MarketScreen({
                   stock={selectedStock}
                   price={selectedPrice}
                 />
+                <div className="grid min-w-0 gap-6 lg:grid-cols-2">
+                  <CalendarWidget
+                    calendar={selectedCalendar}
+                    error={selectedCalendarError}
+                    stock={selectedStock}
+                  />
+                  <ExchangeRateWidget
+                    error={selectedExchangeRateError}
+                    rate={selectedExchangeRate}
+                    stock={selectedStock}
+                  />
+                </div>
                 <div className="grid min-w-0 gap-6 lg:grid-cols-2">
                   <OrderbookWidget
                     error={selectedOrderbookError}

@@ -73,3 +73,37 @@ export type MarketCandlePage = {
   candles: readonly MarketCandle[];
   nextBefore?: string | null;
 };
+
+export type MarketCountry = "KR" | "US";
+export type MarketSessionKind = "day" | "pre" | "regular" | "after";
+
+export type MarketSession = {
+  kind: MarketSessionKind;
+  startTime: string;
+  endTime: string;
+};
+
+export type MarketDay = {
+  date: string;
+  sessions: readonly MarketSession[];
+};
+
+export type MarketCalendar = {
+  country: MarketCountry;
+  marketTimeZone: "Asia/Seoul" | "America/New_York";
+  displayTimeZone: "Asia/Seoul";
+  today: MarketDay;
+  previousBusinessDay: MarketDay;
+  nextBusinessDay: MarketDay;
+};
+
+export type ExchangeRate = {
+  baseCurrency: string;
+  quoteCurrency: string;
+  rate: DecimalString;
+  midRate: DecimalString;
+  basisPoint: DecimalString;
+  rateChangeType: "UP" | "EQUAL" | "DOWN";
+  validFrom: string;
+  validUntil: string;
+};

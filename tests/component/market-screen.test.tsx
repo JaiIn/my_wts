@@ -181,13 +181,17 @@ describe("market screen", () => {
     fireEvent.change(search, { target: { value: "empty1" } });
     fireEvent.click(screen.getByRole("option"));
     expect(
-      screen.getAllByRole("status").some(({ textContent }) =>
-        textContent?.includes("현재가가 없습니다."),
-      ),
+      screen
+        .getAllByRole("status")
+        .some(({ textContent }) => textContent?.includes("현재가가 없습니다.")),
     ).toBe(true);
-    expect(screen.getAllByRole("status").some(({ textContent }) =>
-      textContent?.includes("호가가 비어 있습니다."),
-    )).toBe(true);
+    expect(
+      screen
+        .getAllByRole("status")
+        .some(({ textContent }) =>
+          textContent?.includes("호가가 비어 있습니다."),
+        ),
+    ).toBe(true);
     expect(
       screen.getByRole("table", { name: "가격 미제공 테스트 최근 체결 내역" }),
     ).toBeTruthy();
@@ -196,9 +200,11 @@ describe("market screen", () => {
     fireEvent.change(search, { target: { value: "err1" } });
     fireEvent.click(screen.getByRole("option"));
     expect(
-      screen.getAllByRole("alert").some(({ textContent }) =>
-        textContent?.includes("종목 유의사항을 불러오지 못했습니다."),
-      ),
+      screen
+        .getAllByRole("alert")
+        .some(({ textContent }) =>
+          textContent?.includes("종목 유의사항을 불러오지 못했습니다."),
+        ),
     ).toBe(true);
     expect(screen.getByTestId("last-price").textContent).toBe("123.45 XTS");
     expect(document.body.textContent).not.toContain("internal-error");
@@ -206,9 +212,7 @@ describe("market screen", () => {
     expect(document.body.textContent).not.toContain(
       "Mock warning lookup failed.",
     );
-    expect(document.body.textContent).toContain(
-      "호가를 불러오지 못했습니다.",
-    );
+    expect(document.body.textContent).toContain("호가를 불러오지 못했습니다.");
     expect(document.body.textContent).toContain(
       "체결 내역을 불러오지 못했습니다.",
     );
@@ -240,9 +244,11 @@ describe("market screen", () => {
       }).textContent,
     ).toContain("9,007,199,254,740,993.223456789 XTS");
     expect(
-      screen.getAllByRole("status").some(({ textContent }) =>
-        textContent?.includes("체결 내역이 없습니다."),
-      ),
+      screen
+        .getAllByRole("status")
+        .some(({ textContent }) =>
+          textContent?.includes("체결 내역이 없습니다."),
+        ),
     ).toBe(true);
     expect(document.body.textContent).not.toContain("72,100 KRW");
 
@@ -283,13 +289,9 @@ describe("market screen", () => {
     await renderMarketPage();
 
     expect(screen.getByTestId("candle-count").textContent).toBe("100개");
-    fireEvent.click(
-      screen.getByRole("button", { name: "이전 캔들 더 보기" }),
-    );
+    fireEvent.click(screen.getByRole("button", { name: "이전 캔들 더 보기" }));
     expect(screen.getByTestId("candle-count").textContent).toBe("200개");
-    fireEvent.click(
-      screen.getByRole("button", { name: "이전 캔들 더 보기" }),
-    );
+    fireEvent.click(screen.getByRole("button", { name: "이전 캔들 더 보기" }));
     expect(screen.getByTestId("candle-count").textContent).toBe("201개");
     expect(screen.getByText("마지막 페이지입니다.")).toBeTruthy();
     expect(
@@ -328,7 +330,9 @@ describe("market screen", () => {
     fireEvent.click(screen.getByRole("button", { name: "1분봉" }));
     expect(screen.getByTestId("candle-count").textContent).toBe("3개");
     expect(
-      screen.getByRole("button", { name: "1분봉" }).getAttribute("aria-pressed"),
+      screen
+        .getByRole("button", { name: "1분봉" })
+        .getAttribute("aria-pressed"),
     ).toBe("true");
 
     fireEvent.click(screen.getByRole("button", { name: "일봉" }));
@@ -354,9 +358,7 @@ describe("market screen", () => {
     const table = screen.getByRole("table", {
       name: "미래 계약 테스트 1d 캔들 원본 데이터",
     });
-    expect(table.textContent).toContain(
-      "9,007,199,254,740,993.123456780 XTS",
-    );
+    expect(table.textContent).toContain("9,007,199,254,740,993.123456780 XTS");
     expect(table.textContent).toContain("90,071,992,547,409,931,234,567,890");
 
     fireEvent.click(screen.getByRole("button", { name: "1분봉" }));
@@ -376,10 +378,10 @@ describe("market screen", () => {
 
     expect(screen.getByText("캔들 데이터를 불러오지 못했습니다.")).toBeTruthy();
     expect(screen.getByTestId("last-price").textContent).toBe("123.45 XTS");
-    expect(document.body.textContent).toContain(
-      "호가를 불러오지 못했습니다.",
+    expect(document.body.textContent).toContain("호가를 불러오지 못했습니다.");
+    expect(document.body.textContent).not.toContain(
+      "Mock candle lookup failed.",
     );
-    expect(document.body.textContent).not.toContain("Mock candle lookup failed.");
     expect(document.body.textContent).not.toContain("mock-candle-request");
   });
 
@@ -406,5 +408,54 @@ describe("market screen", () => {
     );
     expect(screen.queryByRole("combobox")).toBeNull();
     expect(screen.queryByTestId("last-price")).toBeNull();
+  });
+
+  it("shows deterministic calendar data and only needed currency conversion", async () => {
+    await renderMarketPage();
+
+    expect(screen.getByRole("heading", { name: "장 운영 상태" })).toBeTruthy();
+    expect(screen.getByText("Asia/Seoul")).toBeTruthy();
+    expect(screen.queryByRole("heading", { name: "참고 환율" })).toBeNull();
+
+    const search = screen.getByRole("combobox");
+    fireEvent.change(search, { target: { value: "aapl" } });
+    fireEvent.click(screen.getByRole("option"));
+
+    expect(screen.getByText("정규장 운영 중")).toBeTruthy();
+    expect(
+      screen.getByText("Asia/Seoul · 현지 기준일 America/New_York"),
+    ).toBeTruthy();
+    expect(screen.getByRole("list", { name: "장 세션" })).toBeTruthy();
+    expect(screen.getByRole("heading", { name: "참고 환율" })).toBeTruthy();
+    expect(screen.getByTestId("exchange-rate").textContent).toBe(
+      "1,375.123456789012345678 KRW",
+    );
+    expect(screen.getByText("USD/KRW")).toBeTruthy();
+    expect(document.body.textContent).toContain("고정 mock");
+    expect(document.body.textContent).toContain("비실시간");
+  });
+
+  it("clears stale calendar and exchange-rate data for unknown and no-result states", async () => {
+    await renderMarketPage();
+    const search = screen.getByRole("combobox");
+
+    fireEvent.change(search, { target: { value: "aapl" } });
+    fireEvent.click(screen.getByRole("option"));
+    expect(screen.getByTestId("exchange-rate")).toBeTruthy();
+
+    fireEvent.change(search, { target: { value: "fwd1" } });
+    fireEvent.click(screen.getByRole("option"));
+    expect(screen.queryByTestId("exchange-rate")).toBeNull();
+    expect(document.body.textContent).not.toContain("1,375.123456789012345678");
+    expect(document.body.textContent).toContain(
+      "장 운영 정보를 제공하지 않는 시장입니다.",
+    );
+    expect(document.body.textContent).toContain(
+      "환율 정보를 제공하지 않는 통화입니다.",
+    );
+
+    fireEvent.change(search, { target: { value: "missing" } });
+    expect(screen.queryByRole("heading", { name: "장 운영 상태" })).toBeNull();
+    expect(screen.queryByRole("heading", { name: "참고 환율" })).toBeNull();
   });
 });

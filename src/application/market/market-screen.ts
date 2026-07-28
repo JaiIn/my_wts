@@ -1,6 +1,9 @@
 import type {
   CandleInterval,
+  ExchangeRate,
   MarketCandle,
+  MarketCalendar,
+  MarketCountry,
   MarketOrderbook,
   MarketTrade,
   MarketWarning,
@@ -90,6 +93,36 @@ export type SymbolIntervalErrorView = SymbolErrorView & {
   interval: CandleInterval;
 };
 
+export type MarketSessionView = {
+  kind: "day" | "pre" | "regular" | "after";
+  startTime: string;
+  endTime: string;
+};
+
+export type MarketCalendarView = {
+  symbol: string;
+  country: MarketCountry;
+  marketTimeZone: string;
+  displayTimeZone: string;
+  date: string;
+  status: "day" | "pre" | "regular" | "after" | "closed";
+  sessions: readonly MarketSessionView[];
+  previousBusinessDay: string;
+  nextBusinessDay: string;
+};
+
+export type ExchangeRateView = {
+  symbol: string;
+  baseCurrency: string;
+  quoteCurrency: string;
+  rate: string;
+  midRate: string;
+  basisPoint: string;
+  rateChangeType: "UP" | "EQUAL" | "DOWN";
+  validFrom: string;
+  validUntil: string;
+};
+
 export type MarketScreenErrorView = {
   kind: "invalid-data" | "not-found" | "unavailable" | "unexpected";
   title: string;
@@ -120,8 +153,15 @@ export type MarketScreenData = {
   orderbookErrors: readonly SymbolErrorView[];
   tradeErrors: readonly SymbolErrorView[];
   candleErrors: readonly SymbolIntervalErrorView[];
+  calendars?: readonly MarketCalendarView[];
+  exchangeRates?: readonly ExchangeRateView[];
+  calendarErrors?: readonly SymbolErrorView[];
+  exchangeRateErrors?: readonly SymbolErrorView[];
   screenError?: MarketScreenErrorView;
 };
+
+export const MARKET_SCREEN_REFERENCE_TIME = "2025-03-10T23:00:00+09:00";
+export const MARKET_SCREEN_REFERENCE_DATE = "2025-03-10";
 
 const WARNING_MESSAGES: Record<string, { title: string; description: string }> =
   {
@@ -179,6 +219,8 @@ export function safeMarketScreenError(
   subject:
     | "candles"
     | "market"
+    | "calendar"
+    | "exchange-rate"
     | "orderbook"
     | "price"
     | "trades"
@@ -188,17 +230,21 @@ export function safeMarketScreenError(
     return {
       kind: "not-found",
       title:
-        subject === "price"
-          ? "현재가를 찾을 수 없습니다."
-          : subject === "candles"
-            ? "캔들 데이터를 찾을 수 없습니다."
-          : subject === "orderbook"
-            ? "호가를 찾을 수 없습니다."
-            : subject === "trades"
-              ? "체결 내역을 찾을 수 없습니다."
-          : subject === "warnings"
-            ? "종목 유의사항을 찾을 수 없습니다."
-            : "시장 데이터를 찾을 수 없습니다.",
+        subject === "calendar"
+          ? "장 운영 정보를 제공하지 않는 시장입니다."
+          : subject === "exchange-rate"
+            ? "환율 정보를 제공하지 않는 통화입니다."
+            : subject === "price"
+              ? "현재가를 찾을 수 없습니다."
+              : subject === "candles"
+                ? "캔들 데이터를 찾을 수 없습니다."
+                : subject === "orderbook"
+                  ? "호가를 찾을 수 없습니다."
+                  : subject === "trades"
+                    ? "체결 내역을 찾을 수 없습니다."
+                    : subject === "warnings"
+                      ? "종목 유의사항을 찾을 수 없습니다."
+                      : "시장 데이터를 찾을 수 없습니다.",
       description: "다른 종목을 선택해 주세요.",
       retryable: false,
     };
@@ -208,17 +254,21 @@ export function safeMarketScreenError(
     return {
       kind: "unavailable",
       title:
-        subject === "warnings"
-          ? "종목 유의사항을 불러오지 못했습니다."
-          : subject === "candles"
-            ? "캔들 데이터를 불러오지 못했습니다."
-          : subject === "orderbook"
-            ? "호가를 불러오지 못했습니다."
-            : subject === "trades"
-              ? "체결 내역을 불러오지 못했습니다."
-          : subject === "price"
-            ? "현재가를 불러오지 못했습니다."
-            : "시장 데이터를 불러오지 못했습니다.",
+        subject === "calendar"
+          ? "장 운영 정보를 불러오지 못했습니다."
+          : subject === "exchange-rate"
+            ? "환율 정보를 불러오지 못했습니다."
+            : subject === "warnings"
+              ? "종목 유의사항을 불러오지 못했습니다."
+              : subject === "candles"
+                ? "캔들 데이터를 불러오지 못했습니다."
+                : subject === "orderbook"
+                  ? "호가를 불러오지 못했습니다."
+                  : subject === "trades"
+                    ? "체결 내역을 불러오지 못했습니다."
+                    : subject === "price"
+                      ? "현재가를 불러오지 못했습니다."
+                      : "시장 데이터를 불러오지 못했습니다.",
       description: "일시적으로 데이터를 사용할 수 없습니다.",
       retryable: error.retryable,
     };
@@ -255,6 +305,10 @@ export function failedMarketScreen(error: unknown): MarketScreenData {
     orderbookErrors: [],
     tradeErrors: [],
     candleErrors: [],
+    calendars: [],
+    exchangeRates: [],
+    calendarErrors: [],
+    exchangeRateErrors: [],
     screenError: safeMarketScreenError(error, "market"),
   };
 }
@@ -370,6 +424,10 @@ export async function loadMarketScreen(
       orderbookErrors: [],
       tradeErrors: [],
       candleErrors: [],
+      calendars: [],
+      exchangeRates: [],
+      calendarErrors: [],
+      exchangeRateErrors: [],
     };
   }
 
@@ -464,6 +522,59 @@ export async function loadMarketScreen(
       }),
     ),
   );
+  const referenceTimestamp = Date.parse(MARKET_SCREEN_REFERENCE_TIME);
+  const calendarResults = await Promise.all(
+    stocks.map(async ({ market, symbol }) => {
+      const country = marketCountryFor(market);
+      if (!country) {
+        return {
+          ok: false as const,
+          symbol,
+          error: safeMarketScreenError(
+            new MarketDataNotFoundError(),
+            "calendar",
+          ),
+        };
+      }
+      try {
+        const calendar = await service.getMarketCalendar({
+          country,
+          date: MARKET_SCREEN_REFERENCE_DATE,
+        });
+        return {
+          ok: true as const,
+          value: calendarView(symbol, calendar, referenceTimestamp),
+        };
+      } catch (error) {
+        return {
+          ok: false as const,
+          symbol,
+          error: safeMarketScreenError(error, "calendar"),
+        };
+      }
+    }),
+  );
+  const exchangeRateResults = await Promise.all(
+    stocks.map(async ({ currency, symbol }) => {
+      if (currency === "KRW") {
+        return { ok: true as const, value: undefined };
+      }
+      try {
+        const rate = await service.getExchangeRate({
+          baseCurrency: currency,
+          quoteCurrency: "KRW",
+          dateTime: MARKET_SCREEN_REFERENCE_TIME,
+        });
+        return { ok: true as const, value: exchangeRateView(symbol, rate) };
+      } catch (error) {
+        return {
+          ok: false as const,
+          symbol,
+          error: safeMarketScreenError(error, "exchange-rate"),
+        };
+      }
+    }),
+  );
 
   return {
     initialSymbol: initialStock?.symbol ?? "",
@@ -511,5 +622,67 @@ export async function loadMarketScreen(
     candleErrors: candleResults
       .filter((result) => !result.ok)
       .map(({ error, interval, symbol }) => ({ symbol, interval, error })),
+    calendars: calendarResults
+      .filter((result) => result.ok)
+      .map(({ value }) => value),
+    exchangeRates: exchangeRateResults.flatMap((result) =>
+      result.ok && result.value ? [result.value] : [],
+    ),
+    calendarErrors: calendarResults
+      .filter((result) => !result.ok)
+      .map(({ error, symbol }) => ({ symbol, error })),
+    exchangeRateErrors: exchangeRateResults
+      .filter((result) => !result.ok)
+      .map(({ error, symbol }) => ({ symbol, error })),
   };
+}
+
+function marketCountryFor(market: string): MarketCountry | undefined {
+  if (market === "KOSPI" || market === "KOSDAQ" || market === "KRX") {
+    return "KR";
+  }
+  if (market === "NASDAQ" || market === "NYSE" || market === "AMEX") {
+    return "US";
+  }
+  return undefined;
+}
+
+export function marketStatusAt(
+  calendar: MarketCalendar,
+  timestamp: number,
+): MarketCalendarView["status"] {
+  const active = calendar.today.sessions.find(
+    ({ startTime, endTime }) =>
+      Date.parse(startTime) <= timestamp && timestamp < Date.parse(endTime),
+  );
+  return active?.kind ?? "closed";
+}
+
+function calendarView(
+  symbol: string,
+  calendar: MarketCalendar,
+  timestamp: number,
+): MarketCalendarView {
+  return {
+    symbol,
+    country: calendar.country,
+    marketTimeZone: calendar.marketTimeZone,
+    displayTimeZone: calendar.displayTimeZone,
+    date: calendar.today.date,
+    status: marketStatusAt(calendar, timestamp),
+    sessions: calendar.today.sessions.map(({ kind, startTime, endTime }) => ({
+      kind,
+      startTime,
+      endTime,
+    })),
+    previousBusinessDay: calendar.previousBusinessDay.date,
+    nextBusinessDay: calendar.nextBusinessDay.date,
+  };
+}
+
+function exchangeRateView(
+  symbol: string,
+  rate: ExchangeRate,
+): ExchangeRateView {
+  return { symbol, ...rate };
 }

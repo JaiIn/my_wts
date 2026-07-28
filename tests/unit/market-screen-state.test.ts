@@ -35,6 +35,12 @@ function emptyService(overrides: Partial<MarketService> = {}): MarketService {
       candles: [],
       nextBefore: null,
     }),
+    getMarketCalendar: async () => {
+      throw new MarketDataNotFoundError();
+    },
+    getExchangeRate: async () => {
+      throw new MarketDataNotFoundError();
+    },
     ...overrides,
   };
 }

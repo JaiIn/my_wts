@@ -1,6 +1,9 @@
 import type {
   CandleInterval,
   MarketCandlePage,
+  ExchangeRate,
+  MarketCalendar,
+  MarketCountry,
   MarketOrderbook,
   MarketPrice,
   MarketStock,
@@ -22,6 +25,15 @@ export interface MarketService {
     before?: string;
     adjusted?: boolean;
   }): Promise<MarketCandlePage>;
+  getMarketCalendar(input: {
+    country: MarketCountry;
+    date: string;
+  }): Promise<MarketCalendar>;
+  getExchangeRate(input: {
+    baseCurrency: string;
+    quoteCurrency: string;
+    dateTime?: string;
+  }): Promise<ExchangeRate>;
 }
 
 export class MarketDataInvalidCursorError extends Error {

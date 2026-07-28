@@ -64,9 +64,9 @@ describe("market screen server-to-client contract", () => {
     expect(
       data.orderbooks.find(({ symbol }) => symbol === "EMPTY1"),
     ).toMatchObject({ asks: [], bids: [] });
-    expect(
-      data.trades.find(({ symbol }) => symbol === "FWD1")?.trades,
-    ).toEqual([]);
+    expect(data.trades.find(({ symbol }) => symbol === "FWD1")?.trades).toEqual(
+      [],
+    );
     expect(
       data.orderbookErrors.find(({ symbol }) => symbol === "ERR1")?.error.kind,
     ).toBe("unavailable");
@@ -93,6 +93,40 @@ describe("market screen server-to-client contract", () => {
         ({ interval, symbol }) => symbol === "ERR1" && interval === "1d",
       )?.error.kind,
     ).toBe("unavailable");
+    expect(
+      data.calendars?.find(({ symbol }) => symbol === "005930"),
+    ).toMatchObject({
+      country: "KR",
+      displayTimeZone: "Asia/Seoul",
+      marketTimeZone: "Asia/Seoul",
+      date: "2025-03-10",
+      status: "closed",
+    });
+    expect(
+      data.calendars?.find(({ symbol }) => symbol === "AAPL"),
+    ).toMatchObject({
+      country: "US",
+      displayTimeZone: "Asia/Seoul",
+      marketTimeZone: "America/New_York",
+      status: "regular",
+    });
+    expect(
+      data.exchangeRates?.find(({ symbol }) => symbol === "AAPL"),
+    ).toMatchObject({
+      baseCurrency: "USD",
+      quoteCurrency: "KRW",
+      rate: "1375.123456789012345678",
+    });
+    expect(data.exchangeRates?.some(({ symbol }) => symbol === "005930")).toBe(
+      false,
+    );
+    expect(
+      data.calendarErrors?.find(({ symbol }) => symbol === "FWD1")?.error.kind,
+    ).toBe("not-found");
+    expect(
+      data.exchangeRateErrors?.find(({ symbol }) => symbol === "FWD1")?.error
+        .kind,
+    ).toBe("not-found");
   });
 
   it("does not expose persistence or authentication internals", async () => {
@@ -114,5 +148,7 @@ describe("market screen server-to-client contract", () => {
     expect(serialized).not.toContain("Mock trades lookup failed.");
     expect(serialized).not.toContain("mock-candle-request");
     expect(serialized).not.toContain("Mock candle lookup failed.");
+    expect(serialized).not.toContain("dateTime");
+    expect(serialized).not.toContain("fetch");
   });
 });
