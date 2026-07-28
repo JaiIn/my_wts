@@ -13,6 +13,9 @@ describe("server-only boundary", () => {
       "src/infrastructure/logging/server-logger.ts",
       "src/infrastructure/toss/token-manager.ts",
       "src/infrastructure/toss/readonly-http-client.ts",
+      "src/infrastructure/market/live-stock-price-provider.ts",
+      "src/infrastructure/market/runtime-stock-price-provider.ts",
+      "src/infrastructure/market/runtime-market-bff.ts",
     ]) {
       expect(readFileSync(resolve(projectRoot, path), "utf8")).toMatch(
         /^import "server-only";/m,
@@ -70,5 +73,22 @@ describe("server-only boundary", () => {
     );
     expect(clientSource).toMatch(/method: "GET"/);
     expect(clientSource).toMatch(/TossHttpTransport/);
+  });
+
+  it("keeps market BFF runtime composition server-only and mutation-free", () => {
+    const sources = [
+      "src/infrastructure/market/live-stock-price-provider.ts",
+      "src/infrastructure/market/runtime-stock-price-provider.ts",
+      "app/api/v1/market/stocks/route.ts",
+      "app/api/v1/market/prices/route.ts",
+    ]
+      .map((path) => readFileSync(resolve(projectRoot, path), "utf8"))
+      .join("\n");
+
+    expect(sources).not.toMatch(
+      /createOrder|modifyOrder|cancelOrder|createConditionalOrder|modifyConditionalOrder|cancelConditionalOrder/,
+    );
+    expect(sources).not.toMatch(/accountSeq|accountNo/);
+    expect(sources).not.toMatch(/method:\s*["'](?:PATCH|PUT|DELETE)["']/);
   });
 });
