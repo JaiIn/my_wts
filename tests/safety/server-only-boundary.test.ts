@@ -13,8 +13,11 @@ describe("server-only boundary", () => {
       "src/infrastructure/logging/server-logger.ts",
       "src/infrastructure/toss/token-manager.ts",
       "src/infrastructure/toss/readonly-http-client.ts",
+      "src/infrastructure/toss/runtime-readonly-client.ts",
       "src/infrastructure/market/live-stock-price-provider.ts",
+      "src/infrastructure/market/live-market-detail-provider.ts",
       "src/infrastructure/market/runtime-stock-price-provider.ts",
+      "src/infrastructure/market/runtime-market-detail-provider.ts",
       "src/infrastructure/market/runtime-market-bff.ts",
     ]) {
       expect(readFileSync(resolve(projectRoot, path), "utf8")).toMatch(
@@ -78,9 +81,15 @@ describe("server-only boundary", () => {
   it("keeps market BFF runtime composition server-only and mutation-free", () => {
     const sources = [
       "src/infrastructure/market/live-stock-price-provider.ts",
+      "src/infrastructure/market/live-market-detail-provider.ts",
       "src/infrastructure/market/runtime-stock-price-provider.ts",
+      "src/infrastructure/market/runtime-market-detail-provider.ts",
+      "src/infrastructure/toss/runtime-readonly-client.ts",
       "app/api/v1/market/stocks/route.ts",
       "app/api/v1/market/prices/route.ts",
+      "app/api/v1/market/stocks/[symbol]/warnings/route.ts",
+      "app/api/v1/market/orderbook/route.ts",
+      "app/api/v1/market/trades/route.ts",
     ]
       .map((path) => readFileSync(resolve(projectRoot, path), "utf8"))
       .join("\n");
@@ -90,5 +99,11 @@ describe("server-only boundary", () => {
     );
     expect(sources).not.toMatch(/accountSeq|accountNo/);
     expect(sources).not.toMatch(/method:\s*["'](?:PATCH|PUT|DELETE)["']/);
+    expect(sources).toContain("/api/v1/orderbook");
+    expect(sources).toContain("/api/v1/trades");
+    expect(sources).toContain("/warnings");
+    expect(sources).not.toMatch(
+      /\/api\/v1\/(?:candles|exchange-rate|market-calendar)/,
+    );
   });
 });

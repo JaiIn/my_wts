@@ -2,9 +2,7 @@ import "server-only";
 
 import type { ServerEnvironment } from "../config/environment";
 import { loadServerEnvironment } from "../config/server-environment";
-import { createServerLogger } from "../logging/server-logger";
-import { createReadonlyTossClient } from "../toss/readonly-http-client";
-import { createTokenManager } from "../toss/token-manager";
+import { createRuntimeReadonlyTossClient } from "../toss/runtime-readonly-client";
 import {
   createMockStockPriceProvider,
   type StockPriceProvider,
@@ -35,44 +33,9 @@ function createRuntimeLiveProvider(
   environment: ServerEnvironment,
   fetchImplementation: FetchFunction,
 ): StockPriceProvider {
-  const logger = createServerLogger(environment);
-  const tokenManager = createTokenManager({
-    environment,
-    logger,
-    transport: {
-      async issueToken(request) {
-        const response = await fetchImplementation(
-          new URL(request.path, environment.tossApiBaseUrl),
-          {
-            method: request.method,
-            headers: { "Content-Type": request.contentType },
-            body: request.body,
-          },
-        );
-        return { status: response.status, body: await response.text() };
-      },
-    },
-  });
-  const client = createReadonlyTossClient({
-    environment,
-    tokenManager,
-    logger,
-    transport: {
-      async send(request) {
-        const response = await fetchImplementation(request.url, {
-          method: "GET",
-          headers: request.headers,
-          signal: request.signal,
-        });
-        return {
-          status: response.status,
-          headers: Object.fromEntries(response.headers.entries()),
-          body: await response.text(),
-        };
-      },
-    },
-  });
-  return createLiveStockPriceProvider(client);
+  return createLiveStockPriceProvider(
+    createRuntimeReadonlyTossClient(environment, fetchImplementation),
+  );
 }
 
 let runtimeSelection: StockPriceProviderSelection | undefined;

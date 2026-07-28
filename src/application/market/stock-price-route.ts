@@ -25,7 +25,7 @@ const SYMBOL_PATTERN = /^[A-Za-z0-9._-]{1,32}$/;
 
 type MarketOperation = "getPrices" | "getStocks";
 
-class MarketRouteForbiddenError extends Error {
+export class MarketRouteForbiddenError extends Error {
   constructor() {
     super("MARKET_ROUTE_FORBIDDEN");
     this.name = "MarketRouteForbiddenError";
@@ -77,7 +77,7 @@ export function parseSymbols(request: NextRequest): readonly string[] {
   return Object.freeze(symbols);
 }
 
-function successResponse(
+export function marketSuccessResponse(
   requestId: string,
   data: unknown,
   now: Date,
@@ -250,7 +250,10 @@ function safeError(error: unknown): SafeError {
   };
 }
 
-function errorResponse(requestId: string, error: unknown): NextResponse {
+export function marketErrorResponse(
+  requestId: string,
+  error: unknown,
+): NextResponse {
   const mapped = safeError(error);
   const headers: Record<string, string> = {
     "Cache-Control": "no-store",
@@ -307,9 +310,9 @@ export function createMarketBffHandler(
         durationMs: Math.max(0, dependencies.now().getTime() - startedAt),
         provider: providerName,
       });
-      return successResponse(requestId, data, dependencies.now());
+      return marketSuccessResponse(requestId, data, dependencies.now());
     } catch (error) {
-      const response = errorResponse(requestId, error);
+      const response = marketErrorResponse(requestId, error);
       dependencies.log?.("market.bff.failed", {
         requestId,
         operation,
