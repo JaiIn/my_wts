@@ -8,6 +8,7 @@ import type {
   MarketTrade,
   MarketWarning,
 } from "../../domain/market/market";
+import type { Watchlist } from "../../domain/watchlist/watchlist";
 import { TossEnvelopeDecodeError } from "../../integrations/toss/envelope";
 import {
   MarketDataNotFoundError,
@@ -157,6 +158,7 @@ export type MarketScreenData = {
   exchangeRates?: readonly ExchangeRateView[];
   calendarErrors?: readonly SymbolErrorView[];
   exchangeRateErrors?: readonly SymbolErrorView[];
+  watchlists?: readonly Watchlist[];
   screenError?: MarketScreenErrorView;
 };
 

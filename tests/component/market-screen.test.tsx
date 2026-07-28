@@ -5,15 +5,20 @@ import {
   fireEvent,
   render,
   screen,
+  waitFor,
   within,
 } from "@testing-library/react";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import MarketPage from "../../app/(dashboard)/market/page";
+import { loadMarketScreen } from "../../src/application/market/market-screen";
+import type { Watchlist } from "../../src/domain/watchlist/watchlist";
+import { createMockMarketService } from "../../src/infrastructure/market/mock-market-service";
 import { MarketScreen } from "../../src/ui/market/market-screen";
 
 afterEach(() => {
   cleanup();
+  vi.unstubAllGlobals();
 });
 
 async function renderMarketPage() {
@@ -457,5 +462,131 @@ describe("market screen", () => {
     fireEvent.change(search, { target: { value: "missing" } });
     expect(screen.queryByRole("heading", { name: "장 운영 상태" })).toBeNull();
     expect(screen.queryByRole("heading", { name: "참고 환율" })).toBeNull();
+  });
+
+  it("adds the selected stock and preserves the list on conflict or error", async () => {
+    const data = await loadMarketScreen(createMockMarketService());
+    const emptyList: Watchlist = {
+      id: "00000000-0000-4000-8000-000000000021",
+      name: "기본 관심종목",
+      sortOrder: 0,
+      isDefault: true,
+      createdAt: "2026-07-28T00:00:00.000Z",
+      updatedAt: "2026-07-28T00:00:00.000Z",
+      items: [],
+    };
+    const updated = {
+      ...emptyList,
+      items: [
+        {
+          symbol: "005930",
+          marketCountry: "KR" as const,
+          sortOrder: 0,
+          addedAt: "2026-07-28T00:00:00.000Z",
+        },
+      ],
+    };
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify({ data: { watchlist: updated } }), {
+          status: 201,
+          headers: { "Content-Type": "application/json" },
+        }),
+      )
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify({ error: { code: "CONFLICT" } }), {
+          status: 409,
+          headers: { "Content-Type": "application/json" },
+        }),
+      );
+    vi.stubGlobal("fetch", fetchMock);
+    render(<MarketScreen {...data} watchlists={[emptyList]} />);
+
+    fireEvent.click(
+      screen.getByRole("button", { name: "선택 종목 추가" }),
+    );
+    await waitFor(() =>
+      expect(screen.getByRole("button", { name: "추가됨" })).toBeTruthy(),
+    );
+    expect(screen.getByText("005930", { selector: "span" })).toBeTruthy();
+    expect(fetchMock).toHaveBeenCalledWith(
+      `/api/v1/watchlists/${emptyList.id}/items`,
+      expect.objectContaining({ method: "POST" }),
+    );
+  });
+
+  it("selects and removes watchlist items with distinct accessible buttons", async () => {
+    const data = await loadMarketScreen(createMockMarketService());
+    const list: Watchlist = {
+      id: "00000000-0000-4000-8000-000000000022",
+      name: "기본 관심종목",
+      sortOrder: 0,
+      isDefault: true,
+      createdAt: "2026-07-28T00:00:00.000Z",
+      updatedAt: "2026-07-28T00:00:00.000Z",
+      items: [
+        {
+          symbol: "AAPL",
+          marketCountry: "US",
+          sortOrder: 0,
+          addedAt: "2026-07-28T00:00:00.000Z",
+        },
+      ],
+    };
+    const fetchMock = vi.fn().mockResolvedValue(new Response(null, { status: 204 }));
+    vi.stubGlobal("fetch", fetchMock);
+    render(<MarketScreen {...data} watchlists={[list]} />);
+
+    fireEvent.click(screen.getByRole("button", { name: /AAPL.*종목 선택/ }));
+    expect(screen.getByTestId("last-price").textContent).toBe("185.70 USD");
+    expect(screen.getByTestId("exchange-rate")).toBeTruthy();
+
+    fireEvent.click(
+      screen.getByRole("button", { name: "AAPL 관심종목 제거" }),
+    );
+    await waitFor(() =>
+      expect(screen.queryByText("AAPL", { selector: "span" })).toBeNull(),
+    );
+    expect(screen.getByText(/AAPL을 관심종목에서 제거/)).toBeTruthy();
+    expect(fetchMock).toHaveBeenCalledWith(
+      `/api/v1/watchlists/${list.id}/items/US/AAPL`,
+      { method: "DELETE" },
+    );
+  });
+
+  it("keeps persisted items visible when a remove request fails", async () => {
+    const data = await loadMarketScreen(createMockMarketService());
+    const list: Watchlist = {
+      id: "00000000-0000-4000-8000-000000000023",
+      name: "기본 관심종목",
+      sortOrder: 0,
+      isDefault: true,
+      createdAt: "2026-07-28T00:00:00.000Z",
+      updatedAt: "2026-07-28T00:00:00.000Z",
+      items: [
+        {
+          symbol: "AAPL",
+          marketCountry: "US",
+          sortOrder: 0,
+          addedAt: "2026-07-28T00:00:00.000Z",
+        },
+      ],
+    };
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue(new Response(null, { status: 500 })),
+    );
+    render(<MarketScreen {...data} watchlists={[list]} />);
+
+    fireEvent.click(
+      screen.getByRole("button", { name: "AAPL 관심종목 제거" }),
+    );
+    const removalError = await screen.findByText(
+      "관심종목을 제거하지 못했습니다. 기존 목록은 유지됩니다.",
+    );
+    expect(screen.getByText("AAPL", { selector: "span" })).toBeTruthy();
+    expect(removalError.getAttribute("role")).toBe("alert");
+    expect(removalError.textContent).not.toMatch(/stack|sql|sqlite|token/i);
   });
 });

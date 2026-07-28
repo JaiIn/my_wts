@@ -17,6 +17,10 @@ import type {
 } from "../../application/market/market-screen";
 import { buildCandleChartView } from "../../application/market/candle-chart";
 import type { CandleInterval } from "../../domain/market/market";
+import type {
+  MarketCountry,
+  Watchlist,
+} from "../../domain/watchlist/watchlist";
 import { CandleChart } from "./candle-chart";
 import { searchMarketStocks } from "./market-search";
 
@@ -205,6 +209,214 @@ function ExchangeRateWidget({
           </p>
         </div>
       )}
+    </section>
+  );
+}
+
+function watchlistCountry(
+  stock: MarketStockView | undefined,
+): MarketCountry | undefined {
+  if (!stock) return undefined;
+  if (["KOSPI", "KOSDAQ", "KRX"].includes(stock.market)) return "KR";
+  if (["NASDAQ", "NYSE", "AMEX"].includes(stock.market)) return "US";
+  return undefined;
+}
+
+function WatchlistPanel({
+  initialWatchlists,
+  onSelect,
+  selectedStock,
+  stocks,
+}: {
+  initialWatchlists: readonly Watchlist[];
+  onSelect: (stock: MarketStockView) => void;
+  selectedStock?: MarketStockView;
+  stocks: readonly MarketStockView[];
+}) {
+  const [watchlists, setWatchlists] = useState(initialWatchlists);
+  const [busyKey, setBusyKey] = useState("");
+  const [message, setMessage] = useState("");
+  const [error, setError] = useState("");
+  const defaultWatchlist =
+    watchlists.find(({ isDefault }) => isDefault) ?? watchlists[0];
+  const country = watchlistCountry(selectedStock);
+  const alreadyAdded = defaultWatchlist?.items.some(
+    (item) =>
+      item.symbol === selectedStock?.symbol && item.marketCountry === country,
+  );
+
+  function replaceWatchlist(updated: Watchlist) {
+    setWatchlists((current) =>
+      current
+        .map((watchlist) => (watchlist.id === updated.id ? updated : watchlist))
+        .sort(
+          (left, right) =>
+            left.sortOrder - right.sortOrder || left.id.localeCompare(right.id),
+        ),
+    );
+  }
+
+  async function addSelected() {
+    if (!defaultWatchlist || !selectedStock || !country || busyKey) return;
+    setBusyKey("add");
+    setError("");
+    setMessage("");
+    try {
+      const response = await fetch(
+        `/api/v1/watchlists/${defaultWatchlist.id}/items`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            symbol: selectedStock.symbol,
+            marketCountry: country,
+          }),
+        },
+      );
+      if (response.status === 409) {
+        setMessage("이미 관심종목에 추가되어 있습니다.");
+        return;
+      }
+      if (!response.ok) throw new Error("WATCHLIST_ADD_FAILED");
+      const body = (await response.json()) as {
+        data?: { watchlist?: Watchlist };
+      };
+      if (!body.data?.watchlist) throw new Error("WATCHLIST_RESPONSE_INVALID");
+      replaceWatchlist(body.data.watchlist);
+      setMessage(`${selectedStock.symbol}을 관심종목에 추가했습니다.`);
+    } catch {
+      setError("관심종목을 추가하지 못했습니다. 기존 목록은 유지됩니다.");
+    } finally {
+      setBusyKey("");
+    }
+  }
+
+  async function removeItem(
+    watchlistId: string,
+    item: Watchlist["items"][number],
+  ) {
+    if (busyKey) return;
+    const key = `${item.marketCountry}:${item.symbol}`;
+    setBusyKey(key);
+    setError("");
+    setMessage("");
+    try {
+      const response = await fetch(
+        `/api/v1/watchlists/${watchlistId}/items/${item.marketCountry}/${encodeURIComponent(item.symbol)}`,
+        { method: "DELETE" },
+      );
+      if (!response.ok) throw new Error("WATCHLIST_DELETE_FAILED");
+      setWatchlists((current) =>
+        current.map((watchlist) =>
+          watchlist.id === watchlistId
+            ? {
+                ...watchlist,
+                items: watchlist.items.filter(
+                  (candidate) =>
+                    candidate.symbol !== item.symbol ||
+                    candidate.marketCountry !== item.marketCountry,
+                ),
+              }
+            : watchlist,
+        ),
+      );
+      setMessage(`${item.symbol}을 관심종목에서 제거했습니다.`);
+    } catch {
+      setError("관심종목을 제거하지 못했습니다. 기존 목록은 유지됩니다.");
+    } finally {
+      setBusyKey("");
+    }
+  }
+
+  return (
+    <section
+      aria-labelledby="watchlist-title"
+      className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm"
+    >
+      <div className="flex flex-wrap items-start justify-between gap-4">
+        <div>
+          <h2 id="watchlist-title" className="text-lg font-semibold">
+            관심종목
+          </h2>
+          <p className="mt-1 text-sm text-slate-600">
+            현재 로그인 사용자의 로컬 SQLite 목록입니다.
+          </p>
+        </div>
+        <button
+          type="button"
+          disabled={
+            !defaultWatchlist ||
+            !selectedStock ||
+            !country ||
+            alreadyAdded ||
+            Boolean(busyKey)
+          }
+          aria-pressed={alreadyAdded}
+          onClick={addSelected}
+          className="rounded-lg border border-blue-300 bg-blue-50 px-4 py-2 text-sm font-semibold text-blue-900 disabled:cursor-not-allowed disabled:opacity-60"
+        >
+          {alreadyAdded
+            ? "추가됨"
+            : busyKey === "add"
+              ? "추가 중"
+              : "선택 종목 추가"}
+        </button>
+      </div>
+
+      {!defaultWatchlist || defaultWatchlist.items.length === 0 ? (
+        <p role="status" className="mt-5 text-sm text-slate-600">
+          저장된 관심종목이 없습니다. 시장 종목을 선택해 추가하세요.
+        </p>
+      ) : (
+        <ul aria-label={defaultWatchlist.name} className="mt-5 grid gap-2">
+          {defaultWatchlist.items.map((item) => {
+            const stock = stocks.find(
+              ({ symbol }) => symbol === item.symbol,
+            );
+            const key = `${item.marketCountry}:${item.symbol}`;
+            return (
+              <li
+                key={key}
+                className="flex items-center justify-between gap-3 rounded-xl border border-slate-200 p-3"
+              >
+                <button
+                  type="button"
+                  disabled={!stock || Boolean(busyKey)}
+                  onClick={() => stock && onSelect(stock)}
+                  className="min-w-0 flex-1 text-left focus:outline-none focus:ring-2 focus:ring-blue-600"
+                >
+                  <span className="block font-semibold">{item.symbol}</span>
+                  <span className="block text-xs text-slate-600">
+                    {item.marketCountry} · 종목 선택
+                  </span>
+                </button>
+                <button
+                  type="button"
+                  disabled={Boolean(busyKey)}
+                  aria-label={`${item.symbol} 관심종목 제거`}
+                  onClick={() => removeItem(defaultWatchlist.id, item)}
+                  className="rounded-lg border border-slate-300 px-3 py-2 text-sm font-semibold disabled:opacity-60"
+                >
+                  {busyKey === key ? "제거 중" : "제거"}
+                </button>
+              </li>
+            );
+          })}
+        </ul>
+      )}
+      {message ? (
+        <p role="status" className="mt-4 text-sm text-blue-800">
+          {message}
+        </p>
+      ) : null}
+      {error ? (
+        <p role="alert" className="mt-4 text-sm text-red-800">
+          {error}
+        </p>
+      ) : null}
+      <p className="mt-4 text-xs text-slate-500">
+        로컬 사용자별 저장 · mock 시장 데이터 · 비실시간
+      </p>
     </section>
   );
 }
@@ -863,6 +1075,7 @@ export function MarketScreen({
   trades,
   warningErrors,
   warnings,
+  watchlists = [],
 }: MarketScreenData) {
   const inputId = useId();
   const listboxId = useId();
@@ -1062,6 +1275,12 @@ export function MarketScreen({
 
             {!hideSelectedData ? (
               <>
+                <WatchlistPanel
+                  initialWatchlists={watchlists}
+                  onSelect={selectStock}
+                  selectedStock={selectedStock}
+                  stocks={stocks}
+                />
                 {selectedStock && !selectedWarningError ? (
                   <WarningBanner
                     stock={selectedStock}

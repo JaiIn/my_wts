@@ -4,6 +4,7 @@ import {
   type SignupPersistenceInput,
 } from "../../application/auth/signup-service";
 import type { AppDatabase } from "../database/database";
+import { watchlists } from "../database/schema";
 import { SessionRepository } from "../database/session-repository";
 import {
   UserRepository,
@@ -17,6 +18,7 @@ export class SqliteSignupPersistence implements SignupPersistence {
     try {
       this.database.transaction((transaction) => {
         new UserRepository(transaction).create(input.user);
+        transaction.insert(watchlists).values(input.watchlist).run();
         new SessionRepository(transaction).create(input.session);
       });
     } catch (error) {

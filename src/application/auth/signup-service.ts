@@ -2,6 +2,7 @@ import { createHash, randomBytes, randomUUID } from "node:crypto";
 
 import { hashPassword } from "../../domain/auth/password";
 import { signupInputSchema } from "../../domain/auth/validation";
+import { DEFAULT_WATCHLIST_NAME } from "../../domain/watchlist/watchlist";
 
 const SESSION_ABSOLUTE_LIFETIME_MS = 7 * 24 * 60 * 60 * 1_000;
 
@@ -23,6 +24,15 @@ export type SignupPersistenceInput = {
     createdAt: string;
     lastSeenAt: string;
     expiresAt: string;
+  };
+  watchlist: {
+    id: string;
+    userId: string;
+    name: string;
+    sortOrder: number;
+    isDefault: number;
+    createdAt: string;
+    updatedAt: string;
   };
 };
 
@@ -60,6 +70,7 @@ type SignupServiceOptions = {
   now?: () => Date;
   createId?: () => string;
   createToken?: () => string;
+  createWatchlistId?: () => string;
 };
 
 function defaultSessionToken(): string {
@@ -74,6 +85,7 @@ export class SignupService {
   private readonly now: () => Date;
   private readonly createId: () => string;
   private readonly createToken: () => string;
+  private readonly createWatchlistId: () => string;
 
   constructor(
     private readonly persistence: SignupPersistence,
@@ -82,6 +94,7 @@ export class SignupService {
     this.now = options.now ?? (() => new Date());
     this.createId = options.createId ?? randomUUID;
     this.createToken = options.createToken ?? defaultSessionToken;
+    this.createWatchlistId = options.createWatchlistId ?? randomUUID;
   }
 
   async signup(input: unknown): Promise<SignupResult> {
@@ -123,6 +136,15 @@ export class SignupService {
         createdAt: createdAt.toISOString(),
         lastSeenAt: createdAt.toISOString(),
         expiresAt: expiresAt.toISOString(),
+      },
+      watchlist: {
+        id: this.createWatchlistId(),
+        userId,
+        name: DEFAULT_WATCHLIST_NAME,
+        sortOrder: 0,
+        isDefault: 1,
+        createdAt: createdAt.toISOString(),
+        updatedAt: createdAt.toISOString(),
       },
     });
 

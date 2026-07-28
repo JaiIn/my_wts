@@ -78,6 +78,17 @@ describe("POST /api/v1/auth/signup", () => {
     expect(cookie).toContain("HttpOnly");
     expect(cookie).toContain("SameSite=strict");
     expect(cookie).toContain("Path=/");
+    expect(
+      database.$client
+        .prepare(
+          "SELECT name, sort_order, is_default FROM watchlists WHERE user_id = ?",
+        )
+        .get(body.data.user.id),
+    ).toEqual({
+      name: "기본 관심종목",
+      sort_order: 0,
+      is_default: 1,
+    });
     expect(cookie).not.toContain("Secure");
 
     const storedUser = database.$client
