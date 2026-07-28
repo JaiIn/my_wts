@@ -44,6 +44,20 @@ describe("auth proxy", () => {
     expect(authenticate).toHaveBeenCalledWith(VALID_TOKEN);
   });
 
+  it("redirects unauthenticated /market access to the safe login destination", () => {
+    const handler = createAuthProxy({
+      authenticate: () => {
+        throw new SessionAuthenticationError("AUTH_REQUIRED");
+      },
+    });
+    const response = handler(proxyRequest("/market"));
+    const location = new URL(response.headers.get("location") ?? "");
+
+    expect(response.status).toBe(307);
+    expect(location.pathname).toBe("/login");
+    expect(location.searchParams.get("next")).toBe("/market");
+  });
+
   it("redirects an authenticated root request to the market screen", () => {
     const handler = createAuthProxy({
       authenticate: () => ({
