@@ -1,12 +1,11 @@
+import { loadServerEnvironment } from "../config/server-environment";
 import { applyMigrations, openDatabase, type AppDatabase } from "./database";
 
 let runtimeDatabase: AppDatabase | undefined;
 
 export function getRuntimeDatabase(): AppDatabase {
   if (!runtimeDatabase) {
-    runtimeDatabase = openDatabase(
-      process.env.DATABASE_PATH ?? "./data/my_wts.sqlite3",
-    );
+    runtimeDatabase = openDatabase(loadServerEnvironment().databasePath);
     applyMigrations(runtimeDatabase);
   }
 
