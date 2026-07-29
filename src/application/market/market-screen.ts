@@ -201,7 +201,10 @@ const WARNING_MESSAGES: Record<string, { title: string; description: string }> =
     },
   };
 
-function warningView(warning: MarketWarning, index: number): MarketWarningView {
+export function marketWarningView(
+  warning: MarketWarning,
+  index: number,
+): MarketWarningView {
   const message = WARNING_MESSAGES[warning.warningType] ?? {
     title: "종목 유의사항",
     description: "확인되지 않은 유형의 종목 유의사항이 있습니다.",
@@ -458,7 +461,7 @@ export async function loadMarketScreen(
         return {
           ok: true as const,
           symbol,
-          values: values.map(warningView),
+          values: values.map(marketWarningView),
         };
       } catch (error) {
         return {
@@ -545,7 +548,7 @@ export async function loadMarketScreen(
         });
         return {
           ok: true as const,
-          value: calendarView(symbol, calendar, referenceTimestamp),
+          value: marketCalendarView(symbol, calendar, referenceTimestamp),
         };
       } catch (error) {
         return {
@@ -567,7 +570,10 @@ export async function loadMarketScreen(
           quoteCurrency: "KRW",
           dateTime: MARKET_SCREEN_REFERENCE_TIME,
         });
-        return { ok: true as const, value: exchangeRateView(symbol, rate) };
+        return {
+          ok: true as const,
+          value: marketExchangeRateView(symbol, rate),
+        };
       } catch (error) {
         return {
           ok: false as const,
@@ -660,7 +666,7 @@ export function marketStatusAt(
   return active?.kind ?? "closed";
 }
 
-function calendarView(
+export function marketCalendarView(
   symbol: string,
   calendar: MarketCalendar,
   timestamp: number,
@@ -682,7 +688,7 @@ function calendarView(
   };
 }
 
-function exchangeRateView(
+export function marketExchangeRateView(
   symbol: string,
   rate: ExchangeRate,
 ): ExchangeRateView {

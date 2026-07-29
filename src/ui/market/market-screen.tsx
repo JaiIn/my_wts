@@ -224,11 +224,13 @@ function watchlistCountry(
 
 function WatchlistPanel({
   initialWatchlists,
+  onChanged,
   onSelect,
   selectedStock,
   stocks,
 }: {
   initialWatchlists: readonly Watchlist[];
+  onChanged?: () => void | Promise<void>;
   onSelect: (stock: MarketStockView) => void;
   selectedStock?: MarketStockView;
   stocks: readonly MarketStockView[];
@@ -283,6 +285,7 @@ function WatchlistPanel({
       };
       if (!body.data?.watchlist) throw new Error("WATCHLIST_RESPONSE_INVALID");
       replaceWatchlist(body.data.watchlist);
+      await onChanged?.();
       setMessage(`${selectedStock.symbol}을 관심종목에 추가했습니다.`);
     } catch {
       setError("관심종목을 추가하지 못했습니다. 기존 목록은 유지됩니다.");
@@ -320,6 +323,7 @@ function WatchlistPanel({
             : watchlist,
         ),
       );
+      await onChanged?.();
       setMessage(`${item.symbol}을 관심종목에서 제거했습니다.`);
     } catch {
       setError("관심종목을 제거하지 못했습니다. 기존 목록은 유지됩니다.");
@@ -370,9 +374,7 @@ function WatchlistPanel({
       ) : (
         <ul aria-label={defaultWatchlist.name} className="mt-5 grid gap-2">
           {defaultWatchlist.items.map((item) => {
-            const stock = stocks.find(
-              ({ symbol }) => symbol === item.symbol,
-            );
+            const stock = stocks.find(({ symbol }) => symbol === item.symbol);
             const key = `${item.marketCountry}:${item.symbol}`;
             return (
               <li
@@ -834,6 +836,8 @@ function CandleWidget({
   pages,
   stock,
   visiblePageCount,
+  hasNextPageOverride,
+  loadingNextPage = false,
 }: {
   error?: MarketScreenErrorView;
   interval: CandleInterval;
@@ -842,6 +846,8 @@ function CandleWidget({
   pages: readonly MarketCandlePageView[];
   stock?: MarketStockView;
   visiblePageCount: number;
+  hasNextPageOverride?: boolean;
+  loadingNextPage?: boolean;
 }) {
   const candles = useMemo(() => {
     const byTimestamp = new Map<string, MarketCandleView>();
@@ -860,7 +866,7 @@ function CandleWidget({
   const directionByTimestamp = new Map(
     chartView.points.map(({ direction, timestamp }) => [timestamp, direction]),
   );
-  const hasNextPage = visiblePageCount < pages.length;
+  const hasNextPage = hasNextPageOverride ?? visiblePageCount < pages.length;
 
   return (
     <section
@@ -1037,10 +1043,11 @@ function CandleWidget({
             {hasNextPage ? (
               <button
                 type="button"
+                disabled={loadingNextPage}
                 className="rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-blue-600"
                 onClick={onNextPage}
               >
-                이전 캔들 더 보기
+                {loadingNextPage ? "이전 캔들 로딩 중" : "이전 캔들 더 보기"}
               </button>
             ) : (
               <p role="status" className="text-sm text-slate-600">
@@ -1056,6 +1063,19 @@ function CandleWidget({
     </section>
   );
 }
+
+export type MarketScreenProps = MarketScreenData &
+  Readonly<{
+    controlledSymbol?: string;
+    controlledCandleInterval?: CandleInterval;
+    hasNextCandlePage?: boolean;
+    isFetchingNextCandlePage?: boolean;
+    onCandleIntervalChange?: (interval: CandleInterval) => void;
+    onNextCandlePage?: () => void;
+    onSymbolChange?: (symbol: string) => void;
+    onWatchlistsChanged?: () => void | Promise<void>;
+    networkStatus?: "fetching" | "stale";
+  }>;
 
 export function MarketScreen({
   calendarErrors = [],
@@ -1076,12 +1096,25 @@ export function MarketScreen({
   warningErrors,
   warnings,
   watchlists = [],
-}: MarketScreenData) {
+  controlledSymbol,
+  controlledCandleInterval,
+  hasNextCandlePage,
+  isFetchingNextCandlePage = false,
+  onCandleIntervalChange,
+  onNextCandlePage,
+  onSymbolChange,
+  onWatchlistsChanged,
+  networkStatus,
+}: MarketScreenProps) {
   const inputId = useId();
   const listboxId = useId();
   const [query, setQuery] = useState("");
-  const [selectedSymbol, setSelectedSymbol] = useState(initialSymbol);
-  const [candleInterval, setCandleInterval] = useState<CandleInterval>("1d");
+  const [internalSelectedSymbol, setInternalSelectedSymbol] =
+    useState(initialSymbol);
+  const [internalCandleInterval, setInternalCandleInterval] =
+    useState<CandleInterval>("1d");
+  const selectedSymbol = controlledSymbol ?? internalSelectedSymbol;
+  const candleInterval = controlledCandleInterval ?? internalCandleInterval;
   const [visibleCandlePages, setVisibleCandlePages] = useState(1);
   const [activeIndex, setActiveIndex] = useState(-1);
   const results = useMemo(
@@ -1139,8 +1172,10 @@ export function MarketScreen({
     if (!stocks.some(({ symbol }) => symbol === stock.symbol)) {
       return;
     }
-    setSelectedSymbol(stock.symbol);
-    setCandleInterval("1d");
+    setInternalSelectedSymbol(stock.symbol);
+    onSymbolChange?.(stock.symbol);
+    setInternalCandleInterval("1d");
+    onCandleIntervalChange?.("1d");
     setVisibleCandlePages(1);
     setQuery("");
     setActiveIndex(-1);
@@ -1177,6 +1212,13 @@ export function MarketScreen({
     <main className="min-h-screen bg-slate-50 px-5 py-10 text-slate-950 sm:px-8">
       <div className="mx-auto grid w-full max-w-5xl gap-8">
         <MarketHeader />
+        {networkStatus ? (
+          <p role="status" className="text-sm text-slate-600">
+            {networkStatus === "fetching"
+              ? "로컬 BFF에서 시장 위젯을 불러오는 중입니다."
+              : "캐시된 시장 데이터를 표시하며 갱신 중입니다."}
+          </p>
+        ) : null}
 
         {screenError ? (
           <section aria-label="시장 데이터 오류">
@@ -1277,6 +1319,7 @@ export function MarketScreen({
               <>
                 <WatchlistPanel
                   initialWatchlists={watchlists}
+                  onChanged={onWatchlistsChanged}
                   onSelect={selectStock}
                   selectedStock={selectedStock}
                   stocks={stocks}
@@ -1325,20 +1368,31 @@ export function MarketScreen({
                   error={selectedCandleError}
                   interval={candleInterval}
                   onIntervalChange={(interval) => {
-                    setCandleInterval(interval);
+                    setInternalCandleInterval(interval);
+                    onCandleIntervalChange?.(interval);
                     setVisibleCandlePages(1);
                   }}
-                  onNextPage={() =>
+                  onNextPage={() => {
+                    if (onNextCandlePage) {
+                      onNextCandlePage();
+                      return;
+                    }
                     setVisibleCandlePages((current) =>
                       Math.min(
                         current + 1,
                         selectedCandleSeries?.pages.length ?? 1,
                       ),
-                    )
-                  }
+                    );
+                  }}
                   pages={selectedCandleSeries?.pages ?? []}
                   stock={selectedStock}
-                  visiblePageCount={visibleCandlePages}
+                  visiblePageCount={
+                    onNextCandlePage
+                      ? (selectedCandleSeries?.pages.length ?? 1)
+                      : visibleCandlePages
+                  }
+                  hasNextPageOverride={hasNextCandlePage}
+                  loadingNextPage={isFetchingNextCandlePage}
                 />
               </>
             ) : null}

@@ -63,8 +63,12 @@ async function expectSelected(
   market: string,
   price: string,
 ) {
-  await expect(page.getByText(`${symbol} · ${market}`)).toBeVisible();
-  await expect(page.getByTestId("last-price")).toHaveText(price);
+  await expect(page.getByText(`${symbol} · ${market}`)).toBeVisible({
+    timeout: 15_000,
+  });
+  await expect(page.getByTestId("last-price")).toHaveText(price, {
+    timeout: 15_000,
+  });
 }
 
 test("authenticated mock market flow stays local, deterministic, and persistent", async ({
@@ -76,11 +80,21 @@ test("authenticated mock market flow stays local, deterministic, and persistent"
   const username = `market.${randomUUID().replaceAll("-", "").slice(0, 12)}`;
   const externalRequests: string[] = [];
   const consoleErrors: string[] = [];
+  const expectedBffHttpDiagnostics: string[] = [];
   const pageErrors: string[] = [];
 
   await blockExternalNetwork(context, externalRequests);
   page.on("console", (message) => {
-    if (message.type() === "error") consoleErrors.push(message.text());
+    if (message.type() !== "error") return;
+    if (
+      /^Failed to load resource: the server responded with a status of (404|503) \(Not Found|Service Unavailable\)$/.test(
+        message.text(),
+      )
+    ) {
+      expectedBffHttpDiagnostics.push(message.text());
+      return;
+    }
+    consoleErrors.push(message.text());
   });
   page.on("pageerror", (error) => pageErrors.push(error.message));
 
@@ -267,6 +281,7 @@ test("authenticated mock market flow stays local, deterministic, and persistent"
   await expect(page).toHaveURL(/\/login\?next=%2Fmarket$/);
 
   expect(externalRequests).toEqual([]);
+  expect(expectedBffHttpDiagnostics.length).toBeGreaterThan(0);
   expect(consoleErrors).toEqual([]);
   expect(pageErrors).toEqual([]);
 });

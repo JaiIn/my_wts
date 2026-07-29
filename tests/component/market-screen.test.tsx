@@ -10,11 +10,11 @@ import {
 } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import MarketPage from "../../app/(dashboard)/market/page";
 import { loadMarketScreen } from "../../src/application/market/market-screen";
 import type { Watchlist } from "../../src/domain/watchlist/watchlist";
 import { createMockMarketService } from "../../src/infrastructure/market/mock-market-service";
 import { MarketScreen } from "../../src/ui/market/market-screen";
+import { MarketQueryProvider } from "../../src/ui/market/market-query-provider";
 
 afterEach(() => {
   cleanup();
@@ -22,7 +22,8 @@ afterEach(() => {
 });
 
 async function renderMarketPage() {
-  render(await MarketPage());
+  const data = await loadMarketScreen(createMockMarketService());
+  render(<MarketScreen {...data} />, { wrapper: MarketQueryProvider });
 }
 
 describe("market screen", () => {
@@ -406,6 +407,7 @@ describe("market screen", () => {
         tradeErrors={[]}
         candleErrors={[]}
       />,
+      { wrapper: MarketQueryProvider },
     );
 
     expect(screen.getByRole("status").textContent).toContain(
@@ -501,11 +503,11 @@ describe("market screen", () => {
         }),
       );
     vi.stubGlobal("fetch", fetchMock);
-    render(<MarketScreen {...data} watchlists={[emptyList]} />);
+    render(<MarketScreen {...data} watchlists={[emptyList]} />, {
+      wrapper: MarketQueryProvider,
+    });
 
-    fireEvent.click(
-      screen.getByRole("button", { name: "선택 종목 추가" }),
-    );
+    fireEvent.click(screen.getByRole("button", { name: "선택 종목 추가" }));
     await waitFor(() =>
       expect(screen.getByRole("button", { name: "추가됨" })).toBeTruthy(),
     );
@@ -534,17 +536,19 @@ describe("market screen", () => {
         },
       ],
     };
-    const fetchMock = vi.fn().mockResolvedValue(new Response(null, { status: 204 }));
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValue(new Response(null, { status: 204 }));
     vi.stubGlobal("fetch", fetchMock);
-    render(<MarketScreen {...data} watchlists={[list]} />);
+    render(<MarketScreen {...data} watchlists={[list]} />, {
+      wrapper: MarketQueryProvider,
+    });
 
     fireEvent.click(screen.getByRole("button", { name: /AAPL.*종목 선택/ }));
     expect(screen.getByTestId("last-price").textContent).toBe("185.70 USD");
     expect(screen.getByTestId("exchange-rate")).toBeTruthy();
 
-    fireEvent.click(
-      screen.getByRole("button", { name: "AAPL 관심종목 제거" }),
-    );
+    fireEvent.click(screen.getByRole("button", { name: "AAPL 관심종목 제거" }));
     await waitFor(() =>
       expect(screen.queryByText("AAPL", { selector: "span" })).toBeNull(),
     );
@@ -577,11 +581,11 @@ describe("market screen", () => {
       "fetch",
       vi.fn().mockResolvedValue(new Response(null, { status: 500 })),
     );
-    render(<MarketScreen {...data} watchlists={[list]} />);
+    render(<MarketScreen {...data} watchlists={[list]} />, {
+      wrapper: MarketQueryProvider,
+    });
 
-    fireEvent.click(
-      screen.getByRole("button", { name: "AAPL 관심종목 제거" }),
-    );
+    fireEvent.click(screen.getByRole("button", { name: "AAPL 관심종목 제거" }));
     const removalError = await screen.findByText(
       "관심종목을 제거하지 못했습니다. 기존 목록은 유지됩니다.",
     );
