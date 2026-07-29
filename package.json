@@ -38,6 +38,7 @@
     "react": "19.2.8",
     "react-dom": "19.2.8",
     "react-hook-form": "7.82.0",
+    "server-only": "0.0.1",
     "sonner": "2.0.7",
     "tailwindcss": "4.3.3",
     "zod": "4.4.3"
