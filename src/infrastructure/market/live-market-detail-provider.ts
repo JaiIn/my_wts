@@ -70,11 +70,21 @@ function toLevel(
 }
 
 function toMarketOrderbook(value: TossOrderbookResponse): MarketOrderbook {
+  const asks = value.asks
+    .map(toLevel)
+    .sort((left, right) =>
+      decimalFromString(left.price).comparedTo(right.price),
+    );
+  const bids = value.bids
+    .map(toLevel)
+    .sort((left, right) =>
+      decimalFromString(right.price).comparedTo(left.price),
+    );
   return {
-    observedAt: value.timestamp,
+    observedAt: value.timestamp ?? null,
     currency: value.currency,
-    asks: value.asks.map(toLevel),
-    bids: value.bids.map(toLevel),
+    asks,
+    bids,
   };
 }
 

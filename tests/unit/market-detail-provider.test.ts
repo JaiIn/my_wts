@@ -120,6 +120,93 @@ describe("market detail providers", () => {
 
   it.each([
     {
+      name: "official KR descending ask example",
+      result: {
+        timestamp: "2026-03-25T09:30:00.123+09:00",
+        currency: "KRW",
+        asks: [
+          { price: "72300", volume: "1" },
+          { price: "72200", volume: "2" },
+          { price: "72100", volume: "3" },
+        ],
+        bids: [
+          { price: "72000", volume: "4" },
+          { price: "71900", volume: "5" },
+          { price: "71800", volume: "6" },
+        ],
+      },
+      timestamp: "2026-03-25T09:30:00.123+09:00",
+    },
+    {
+      name: "explicit null timestamp and empty levels",
+      result: { timestamp: null, currency: "KRW", asks: [], bids: [] },
+      timestamp: null,
+    },
+    {
+      name: "omitted timestamp and empty levels",
+      result: { currency: "KRW", asks: [], bids: [] },
+      timestamp: null,
+    },
+  ])(
+    "normalizes $name without mutating the wire value",
+    async ({ result, timestamp }) => {
+      const original = structuredClone(result);
+      const provider = createLiveMarketDetailProvider(
+        fakeClient(() => ({ result })),
+      );
+
+      const orderbook = toOrderbookResponse(
+        await provider.getOrderbook("005930"),
+      );
+
+      expect(orderbook.timestamp).toBe(timestamp);
+      expect(orderbook.asks.map(({ price }) => price)).toEqual(
+        result.asks
+          .map(({ price }) => price)
+          .sort((left, right) =>
+            left.localeCompare(right, "en", { numeric: true }),
+          ),
+      );
+      expect(orderbook.bids.map(({ price }) => price)).toEqual(
+        result.bids
+          .map(({ price }) => price)
+          .sort((left, right) =>
+            right.localeCompare(left, "en", { numeric: true }),
+          ),
+      );
+      expect(result).toEqual(original);
+    },
+  );
+
+  it("sorts large decimal orderbook levels without changing their strings", async () => {
+    const provider = createLiveMarketDetailProvider(
+      fakeClient(() => ({
+        result: {
+          currency: "KRW",
+          asks: [
+            { price: "9007199254740993.00000002", volume: "1" },
+            { price: "9007199254740993.00000001", volume: "2" },
+          ],
+          bids: [
+            { price: "0.0000000000000001", volume: "3" },
+            { price: "0.0000000000000002", volume: "4" },
+          ],
+        },
+      })),
+    );
+    const orderbook = await provider.getOrderbook("005930");
+    expect(orderbook.asks.map(({ price }) => price)).toEqual([
+      "9007199254740993.00000001",
+      "9007199254740993.00000002",
+    ]);
+    expect(orderbook.bids.map(({ price }) => price)).toEqual([
+      "0.0000000000000002",
+      "0.0000000000000001",
+    ]);
+  });
+
+  it.each([
+    {
       name: "equivalent duplicate prices",
       result: {
         currency: "KRW",
@@ -128,21 +215,18 @@ describe("market detail providers", () => {
       },
     },
     {
-      name: "unsorted asks",
-      result: {
-        currency: "KRW",
-        asks: [
-          { price: "102", volume: "1" },
-          { price: "101", volume: "2" },
-        ],
-        bids: [],
-      },
-    },
-    {
       name: "negative decimal",
       result: {
         currency: "KRW",
         asks: [{ price: "-1", volume: "1" }],
+        bids: [],
+      },
+    },
+    {
+      name: "malformed decimal",
+      result: {
+        currency: "KRW",
+        asks: [{ price: "not-decimal", volume: "1" }],
         bids: [],
       },
     },

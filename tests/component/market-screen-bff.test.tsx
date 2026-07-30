@@ -167,6 +167,43 @@ function installBffFetch() {
 }
 
 describe("market screen BFF boundary", () => {
+  it("shows the mock disclosure when live reads are disabled", async () => {
+    installBffFetch();
+    render(
+      <MarketQueryProvider>
+        <MarketScreenBff liveReadEnabled={false} />
+      </MarketQueryProvider>,
+    );
+
+    await waitFor(() => expect(screen.getByText("MOCK DATA")).toBeTruthy());
+    expect(screen.queryByText("Toss Open API 조회 데이터")).toBeNull();
+  });
+
+  it("shows only a read-only live disclosure when live reads are enabled", async () => {
+    const calls = installBffFetch();
+    render(
+      <MarketQueryProvider>
+        <MarketScreenBff liveReadEnabled />
+      </MarketQueryProvider>,
+    );
+
+    await waitFor(() =>
+      expect(screen.getByText("Toss Open API 조회 데이터")).toBeTruthy(),
+    );
+    expect(screen.queryByText("MOCK DATA")).toBeNull();
+    expect(document.body.textContent).toContain(
+      "실제 매수·매도·정정·취소 기능은 제공하지 않습니다",
+    );
+    expect(document.body.textContent).not.toMatch(
+      /client_secret|access_token|authorization|openapi\.tossinvest\.com/i,
+    );
+    const stocksRequest = calls.find(({ path }) =>
+      path.startsWith("/api/v1/market/stocks?"),
+    );
+    expect(stocksRequest?.path).toContain("symbols=005930%2CAAPL");
+    expect(stocksRequest?.path).not.toMatch(/EMPTY1|ERR1|FWD1/);
+  });
+
   it("renders mock widgets through same-origin BFFs and changes every query key", async () => {
     const calls = installBffFetch();
     render(

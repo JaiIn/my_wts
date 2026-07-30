@@ -28,7 +28,7 @@ import {
   getMarketTrades,
   getMarketWarnings,
   getWatchlists,
-  MARKET_BFF_SYMBOLS,
+  marketBootstrapSymbols,
   MarketBffError,
   type BffCalendar,
 } from "./market-bff-client";
@@ -131,14 +131,17 @@ function calendarView(
   };
 }
 
-export function MarketScreenBff() {
+export function MarketScreenBff({
+  liveReadEnabled = false,
+}: Readonly<{ liveReadEnabled?: boolean }>) {
   const queryClient = useQueryClient();
   const [selectedSymbol, setSelectedSymbol] = useState(INITIAL_MARKET_SYMBOL);
   const [interval, setInterval] = useState<CandleInterval>("1d");
+  const bootstrapSymbols = marketBootstrapSymbols(liveReadEnabled);
 
   const stocksQuery = useQuery({
-    queryKey: marketQueryKeys.stocks(MARKET_BFF_SYMBOLS),
-    queryFn: ({ signal }) => getMarketStocks(MARKET_BFF_SYMBOLS, signal),
+    queryKey: marketQueryKeys.stocks(bootstrapSymbols),
+    queryFn: ({ signal }) => getMarketStocks(bootstrapSymbols, signal),
     staleTime: MARKET_QUERY_TTL.stock,
   });
   const stocks = useMemo(
@@ -353,6 +356,7 @@ export function MarketScreenBff() {
   return (
     <MarketScreen
       {...data}
+      liveReadEnabled={liveReadEnabled}
       controlledSymbol={selectedSymbol}
       controlledCandleInterval={interval}
       onSymbolChange={(symbol) => {

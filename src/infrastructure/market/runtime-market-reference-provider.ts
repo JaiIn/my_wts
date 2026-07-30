@@ -6,7 +6,7 @@ import {
 } from "../../application/market/market-reference-provider";
 import type { ServerEnvironment } from "../config/environment";
 import { loadServerEnvironment } from "../config/server-environment";
-import { createRuntimeReadonlyTossClient } from "../toss/runtime-readonly-client";
+import { getRuntimeReadonlyTossClient } from "../toss/runtime-readonly-client";
 import { createLiveMarketReferenceProvider } from "./live-market-reference-provider";
 import { createMockMarketService } from "./mock-market-service";
 
@@ -34,10 +34,7 @@ export function getRuntimeMarketReferenceProvider(): MarketReferenceProviderSele
     mock: createMockMarketReferenceProvider(createMockMarketService()),
     live: () =>
       createLiveMarketReferenceProvider(
-        createRuntimeReadonlyTossClient(
-          loadServerEnvironment(),
-          globalThis.fetch,
-        ),
+        getRuntimeReadonlyTossClient(loadServerEnvironment(), globalThis.fetch),
       ),
   });
   return runtimeSelection;

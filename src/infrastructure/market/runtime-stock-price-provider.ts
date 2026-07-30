@@ -2,7 +2,7 @@ import "server-only";
 
 import type { ServerEnvironment } from "../config/environment";
 import { loadServerEnvironment } from "../config/server-environment";
-import { createRuntimeReadonlyTossClient } from "../toss/runtime-readonly-client";
+import { getRuntimeReadonlyTossClient } from "../toss/runtime-readonly-client";
 import {
   createMockStockPriceProvider,
   type StockPriceProvider,
@@ -34,7 +34,7 @@ function createRuntimeLiveProvider(
   fetchImplementation: FetchFunction,
 ): StockPriceProvider {
   return createLiveStockPriceProvider(
-    createRuntimeReadonlyTossClient(environment, fetchImplementation),
+    getRuntimeReadonlyTossClient(environment, fetchImplementation),
   );
 }
 
