@@ -9,6 +9,7 @@ import {
   getSellableQuantity,
   OrderInfoBffError,
 } from "./order-info-bff-client";
+import { ACCOUNT_QUERY_TTL } from "./account-query-policy";
 
 function retry(failureCount: number, error: Error): boolean {
   return (
@@ -47,7 +48,7 @@ export function OrderInfoPanel({
     queryFn: ({ signal }) => getBuyingPower(currency, signal),
     enabled,
     retry,
-    staleTime: 0,
+    staleTime: ACCOUNT_QUERY_TTL.buyingPower,
     refetchOnWindowFocus: false,
   });
   const sellable = useQuery({
@@ -55,7 +56,7 @@ export function OrderInfoPanel({
     queryFn: ({ signal }) => getSellableQuantity(symbol!, signal),
     enabled: enabled && symbol !== undefined,
     retry,
-    staleTime: 0,
+    staleTime: ACCOUNT_QUERY_TTL.sellableQuantity,
     refetchOnWindowFocus: false,
   });
   const commissions = useQuery({
@@ -63,7 +64,7 @@ export function OrderInfoPanel({
     queryFn: ({ signal }) => getCommissions(signal),
     enabled,
     retry,
-    staleTime: 3_600_000,
+    staleTime: ACCOUNT_QUERY_TTL.commissions,
     refetchOnWindowFocus: false,
   });
 
@@ -77,7 +78,8 @@ export function OrderInfoPanel({
         주문 전 조회 정보
       </h2>
       <p className="mt-2 text-sm text-slate-600">
-        조회용 참고 정보이며 표시 값은 주문을 실행하지 않습니다. 실제 주문 기능은 없습니다.
+        조회용 참고 정보이며 표시 값은 주문을 실행하지 않습니다. 실제 주문
+        기능은 없습니다.
       </p>
 
       <div className="mt-5 grid gap-4 md:grid-cols-3">
@@ -122,9 +124,7 @@ export function OrderInfoPanel({
             onClick={() => {
               const canonical = draftSymbol.trim().toUpperCase();
               setSymbol(
-                /^[A-Za-z0-9.-]{1,32}$/.test(canonical)
-                  ? canonical
-                  : undefined,
+                /^[A-Za-z0-9.-]{1,32}$/.test(canonical) ? canonical : undefined,
               );
             }}
           >
@@ -145,15 +145,24 @@ export function OrderInfoPanel({
 
         <article className="rounded-xl bg-white p-4">
           <h3 className="font-semibold">시장별 수수료율</h3>
-          <QueryState pending={commissions.isPending} error={commissions.isError}>
+          <QueryState
+            pending={commissions.isPending}
+            error={commissions.isError}
+          >
             {commissions.data?.length === 0 ? (
-              <p role="status" className="mt-3">지원 정보가 없습니다.</p>
+              <p role="status" className="mt-3">
+                지원 정보가 없습니다.
+              </p>
             ) : (
               <ul className="mt-3 grid gap-2">
                 {commissions.data?.map((commission) => (
-                  <li key={`${commission.marketCountry}:${commission.startDate ?? ""}`}>
+                  <li
+                    key={`${commission.marketCountry}:${commission.startDate ?? ""}`}
+                  >
                     <span>{commission.marketCountry}</span>{" "}
-                    <span className="font-mono">{commission.commissionRate}%</span>
+                    <span className="font-mono">
+                      {commission.commissionRate}%
+                    </span>
                     <span className="block text-xs text-slate-600">
                       {commission.startDate ?? "시작일 미제공"} –{" "}
                       {commission.endDate ?? "종료일 미제공"}

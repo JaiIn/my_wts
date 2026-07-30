@@ -10,6 +10,10 @@ import {
   selectAccount,
   type BffAccount,
 } from "./account-bff-client";
+import {
+  ACCOUNT_QUERY_TTL,
+  ACCOUNT_SCOPED_QUERY_KEYS,
+} from "./account-query-policy";
 
 const ACCOUNT_TYPE_LABELS = {
   BROKERAGE: "종합매매",
@@ -84,7 +88,7 @@ export function AccountSettingsPanel({
         ![400, 401, 403, 404, 429].includes(error.status)
       );
     },
-    staleTime: 0,
+    staleTime: ACCOUNT_QUERY_TTL.accounts,
   });
   const selectionMutation = useMutation({
     mutationFn: async (accountRef: string | null) => {
@@ -92,6 +96,9 @@ export function AccountSettingsPanel({
       else await selectAccount(accountRef);
     },
     async onSuccess() {
+      for (const queryKey of ACCOUNT_SCOPED_QUERY_KEYS) {
+        queryClient.removeQueries({ queryKey: [queryKey] });
+      }
       await queryClient.invalidateQueries({ queryKey: ["accounts"] });
     },
   });

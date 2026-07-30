@@ -251,7 +251,13 @@ test("authenticated mock market flow stays local, deterministic, and persistent"
   );
   expect(duplicateResponse.status()).toBe(409);
 
+  const reloadWatchlistsPromise = page.waitForResponse(
+    (response) =>
+      new URL(response.url()).pathname === "/api/v1/watchlists" &&
+      response.request().method() === "GET",
+  );
   await page.reload();
+  expect((await reloadWatchlistsPromise).status()).toBe(200);
   await expect(page.getByRole("list", { name: "기본 관심종목" })).toContainText(
     "AAPL",
   );

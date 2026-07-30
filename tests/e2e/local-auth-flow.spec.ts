@@ -144,8 +144,9 @@ test("signup → logout → login keeps the local auth boundary", async ({
   ]);
 
   const protectedResponse = await page.goto("/portfolio");
-  expect(protectedResponse?.status()).toBe(404);
+  expect(protectedResponse?.status()).toBe(200);
   await expect(page).toHaveURL("/portfolio");
+  await expect(page.getByRole("heading", { name: "보유자산" })).toBeVisible();
 
   const duplicateResponse = await context.request.post("/api/v1/auth/signup", {
     data: {
@@ -270,8 +271,9 @@ test("signup → logout → login keeps the local auth boundary", async ({
     });
 
     const finalProtectedResponse = await page.goto("/portfolio");
-    expect(finalProtectedResponse?.status()).toBe(404);
+    expect(finalProtectedResponse?.status()).toBe(200);
     await expect(page).toHaveURL("/portfolio");
+    await expect(page.getByRole("heading", { name: "보유자산" })).toBeVisible();
 
     const database = openDatabase(databasePath!);
     try {

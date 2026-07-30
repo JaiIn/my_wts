@@ -4,6 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import Link from "next/link";
 
 import { AccountBffError, getAccounts } from "./account-bff-client";
+import { ACCOUNT_QUERY_TTL } from "./account-query-policy";
 import {
   getHoldings,
   HoldingsBffError,
@@ -29,14 +30,30 @@ function HoldingsTable({ items }: { items: readonly BffHolding[] }) {
         <caption className="sr-only">선택 계좌 보유자산 목록</caption>
         <thead>
           <tr className="border-b border-slate-300">
-            <th scope="col" className="px-3 py-2">종목</th>
-            <th scope="col" className="px-3 py-2">시장·통화</th>
-            <th scope="col" className="px-3 py-2">수량</th>
-            <th scope="col" className="px-3 py-2">현재가</th>
-            <th scope="col" className="px-3 py-2">평균매입가</th>
-            <th scope="col" className="px-3 py-2">평가액</th>
-            <th scope="col" className="px-3 py-2">손익</th>
-            <th scope="col" className="px-3 py-2">일간손익</th>
+            <th scope="col" className="px-3 py-2">
+              종목
+            </th>
+            <th scope="col" className="px-3 py-2">
+              시장·통화
+            </th>
+            <th scope="col" className="px-3 py-2">
+              수량
+            </th>
+            <th scope="col" className="px-3 py-2">
+              현재가
+            </th>
+            <th scope="col" className="px-3 py-2">
+              평균매입가
+            </th>
+            <th scope="col" className="px-3 py-2">
+              평가액
+            </th>
+            <th scope="col" className="px-3 py-2">
+              손익
+            </th>
+            <th scope="col" className="px-3 py-2">
+              일간손익
+            </th>
           </tr>
         </thead>
         <tbody>
@@ -87,7 +104,7 @@ export function PortfolioPanel({
     queryKey: ["accounts"],
     queryFn: ({ signal }) => getAccounts(signal),
     retry: shouldRetry,
-    staleTime: 0,
+    staleTime: ACCOUNT_QUERY_TTL.accounts,
   });
   const selectedAccount = accountsQuery.data?.find(
     (account) => account.selected,
@@ -97,7 +114,7 @@ export function PortfolioPanel({
     queryFn: ({ signal }) => getHoldings(signal),
     enabled: selectedAccount !== undefined,
     retry: shouldRetry,
-    staleTime: 5_000,
+    staleTime: ACCOUNT_QUERY_TTL.holdings,
     refetchOnWindowFocus: false,
   });
 
