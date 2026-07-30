@@ -4,7 +4,7 @@ import type { ServerEnvironment } from "../config/environment";
 import { createServerLogger } from "../logging/server-logger";
 import {
   createReadonlyTossClient,
-  type ReadonlyTossClient,
+  type AccountScopedReadonlyTossClient,
 } from "./readonly-http-client";
 import { createTokenManager } from "./token-manager";
 
@@ -12,13 +12,13 @@ type FetchFunction = typeof globalThis.fetch;
 const RUNTIME_CLIENT_KEY = Symbol.for("my_wts.runtimeReadonlyTossClient");
 
 type RuntimeGlobal = typeof globalThis & {
-  [RUNTIME_CLIENT_KEY]?: ReadonlyTossClient;
+  [RUNTIME_CLIENT_KEY]?: AccountScopedReadonlyTossClient;
 };
 
 export function createRuntimeReadonlyTossClient(
   environment: ServerEnvironment,
   fetchImplementation: FetchFunction,
-): ReadonlyTossClient {
+): AccountScopedReadonlyTossClient {
   const logger = createServerLogger(environment);
   const tokenManager = createTokenManager({
     environment,
@@ -61,7 +61,7 @@ export function createRuntimeReadonlyTossClient(
 export function getRuntimeReadonlyTossClient(
   environment: ServerEnvironment,
   fetchImplementation: FetchFunction,
-): ReadonlyTossClient {
+): AccountScopedReadonlyTossClient {
   const runtimeGlobal = globalThis as RuntimeGlobal;
   runtimeGlobal[RUNTIME_CLIENT_KEY] ??= createRuntimeReadonlyTossClient(
     environment,

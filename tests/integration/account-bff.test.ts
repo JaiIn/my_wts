@@ -6,6 +6,7 @@ import { NextRequest } from "next/server";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { createAccountBffHandler } from "../../src/application/account/account-route";
+import { createHoldingsBffHandler } from "../../src/application/account/holdings-route";
 import { AccountSelectionService } from "../../src/application/account/account-selection-service";
 import { createAccountSelectionHandlers } from "../../src/application/account/account-selection-route";
 import { LoginService } from "../../src/application/auth/login-service";
@@ -25,6 +26,7 @@ import {
 } from "../../src/infrastructure/database/database";
 import { UserRepository } from "../../src/infrastructure/database/user-repository";
 import { createMockAccountProvider } from "../../src/infrastructure/account/mock-account-provider";
+import { createMockHoldingsProvider } from "../../src/infrastructure/account/mock-holdings-provider";
 import { SqliteAccountSelectionPersistence } from "../../src/infrastructure/account/sqlite-account-selection-persistence";
 import { SessionRepository } from "../../src/infrastructure/database/session-repository";
 import { createAuthProxy } from "../../proxy";
@@ -143,6 +145,76 @@ describe("account BFF session integration", () => {
     expect(redirected.headers.get("location")).toContain(
       "/login?next=%2Fsettings",
     );
+    expect(proxy(pageRequest("/portfolio", token)).status).toBe(200);
+    expect(proxy(pageRequest("/portfolio")).headers.get("location")).toContain(
+      "/login?next=%2Fportfolio",
+    );
+  });
+
+  it("resolves the current session selection server-side before serving holdings", async () => {
+    const token = await createUserAndSession("holdings", 58);
+    const registry = new AccountRefRegistry(
+      () => "acct_holdings_integration_000001",
+    );
+    const selection = new AccountSelectionService(
+      { authenticate: (candidate) => sessionService.authenticate(candidate) },
+      new SqliteAccountSelectionPersistence(database),
+      registry,
+    );
+    const context = selection.authenticate(token);
+    const accountRef = registry
+      .reconcile(context.sessionScope, [
+        {
+          accountNo: "00000001234",
+          accountSeq: 101,
+          accountType: "BROKERAGE",
+        },
+      ])
+      .get(101)!;
+    selection.select(token, accountRef);
+    const getHoldings = vi.fn(createMockHoldingsProvider().getHoldings);
+    const handler = createHoldingsBffHandler({
+      provider: () => ({
+        name: "mock",
+        implementation: { getHoldings },
+      }),
+      selection,
+      createRequestId: () => REQUEST_ID,
+      now: () => NOW,
+    });
+    const response = await handler(
+      new NextRequest(
+        "http://127.0.0.1:3000/api/v1/portfolio/holdings",
+        {
+          headers: {
+            Host: "127.0.0.1:3000",
+            Cookie: `my_wts_session=${token}`,
+          },
+        },
+      ),
+    );
+    const body = await response.json();
+    expect(response.status).toBe(200);
+    expect(getHoldings).toHaveBeenCalledWith(101, undefined);
+    expect(body.data.items).toHaveLength(2);
+    expect(JSON.stringify(body)).not.toMatch(
+      /accountSeq|accountRef|00000001234|authorization|cookie/i,
+    );
+
+    selection.clear(token);
+    const blocked = await handler(
+      new NextRequest(
+        "http://127.0.0.1:3000/api/v1/portfolio/holdings",
+        {
+          headers: {
+            Host: "127.0.0.1:3000",
+            Cookie: `my_wts_session=${token}`,
+          },
+        },
+      ),
+    );
+    expect(blocked.status).toBe(409);
+    expect((await blocked.json()).error.code).toBe("ACCOUNT_NOT_SELECTED");
   });
 
   it("persists explicit selection per session, rejects cross-session refs, clears, and survives logout safely", async () => {

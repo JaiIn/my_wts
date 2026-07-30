@@ -9,11 +9,32 @@ describe("account read-only and browser boundary", () => {
     const browserSources = [
       read("src/ui/account/account-bff-client.ts"),
       read("src/ui/account/account-settings-panel.tsx"),
+      read("src/ui/account/holdings-bff-client.ts"),
+      read("src/ui/account/portfolio-panel.tsx"),
     ].join("\n");
     expect(browserSources).not.toMatch(
       /accountSeq|account-ref-registry|live-account-provider|runtime-account-provider|readonly-http-client|TokenManager|server-environment|process\.env|Authorization|Cookie|TOSS_CLIENT|openapi\.tossinvest\.com/i,
     );
     expect(browserSources).not.toMatch(/\baccountNo\b/);
+  });
+
+  it("keeps holdings account scope server-only and read-only", () => {
+    const client = read("src/ui/account/holdings-bff-client.ts");
+    const adapter = read(
+      "src/infrastructure/account/live-holdings-provider.ts",
+    );
+    const http = read("src/infrastructure/toss/readonly-http-client.ts");
+    const route = read("app/api/v1/portfolio/holdings/route.ts");
+    expect(client).toContain('fetch("/api/v1/portfolio/holdings"');
+    expect(client).toContain('method: "GET"');
+    expect(client).not.toMatch(/accountRef|accountSeq|accountNo|https?:\/\//);
+    expect(adapter).toContain('path: "/api/v1/holdings"');
+    expect(adapter).toContain("getAccountScoped");
+    expect(http).toContain('const ACCOUNT_HEADER = "x-tossinvest-account"');
+    expect(route).toContain("export const GET");
+    expect([adapter, route].join("\n")).not.toMatch(
+      /createOrder|modifyOrder|cancelOrder|POST|PUT|PATCH|DELETE/,
+    );
   });
 
   it("uses only same-origin account list and selection BFFs from the browser", () => {

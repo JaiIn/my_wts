@@ -10,6 +10,7 @@ const AUTHORIZATION_HEADER = "authorization";
 const CONTENT_TYPE_HEADER = "content-type";
 const REQUEST_ID_HEADER = "x-request-id";
 const RETRY_AFTER_HEADER = "retry-after";
+const ACCOUNT_HEADER = "x-tossinvest-account";
 
 const EXACT_READONLY_PATHS = new Set([
   "/api/v1/orderbook",
@@ -54,6 +55,15 @@ export type TossGetRequest = Readonly<{
   responseType?: TossResponseType;
   signal?: AbortSignal;
   headers?: Readonly<Record<string, string>>;
+}>;
+
+export type TossAccountScopedGetRequest = Readonly<{
+  path: "/api/v1/holdings";
+  operation: "getHoldings";
+  accountSeq: number;
+  query?: TossQuery;
+  responseType?: TossResponseType;
+  signal?: AbortSignal;
 }>;
 
 export type TossHttpTransportRequest = Readonly<{
@@ -145,6 +155,13 @@ type ReadonlyTossClientOptions = Readonly<{
 export type ReadonlyTossClient = Readonly<{
   get<T = unknown>(request: TossGetRequest): Promise<TossHttpResult<T>>;
 }>;
+
+export type AccountScopedReadonlyTossClient = ReadonlyTossClient &
+  Readonly<{
+  getAccountScoped<T = unknown>(
+    request: TossAccountScopedGetRequest,
+  ): Promise<TossHttpResult<T>>;
+  }>;
 
 function defaultScheduler(): TimeoutScheduler {
   return Object.freeze({
@@ -376,7 +393,7 @@ function decodeResponse<T>(
 
 export function createReadonlyTossClient(
   options: ReadonlyTossClientOptions,
-): ReadonlyTossClient {
+): AccountScopedReadonlyTossClient {
   const clock = options.clock ?? Date.now;
   const scheduler = options.scheduler ?? defaultScheduler();
 
@@ -385,6 +402,7 @@ export function createReadonlyTossClient(
     accessToken: string,
     callerSignal: AbortSignal | undefined,
     operation: string,
+    accountSeq?: number,
   ): Promise<TossHttpTransportResponse> {
     if (callerSignal?.aborted) {
       throw new TossHttpClientError("TOSS_GET_ABORTED", false, operation);
@@ -408,6 +426,9 @@ export function createReadonlyTossClient(
         accept: "application/json",
       };
       headers[AUTHORIZATION_HEADER] = `Bearer ${accessToken}`;
+      if (accountSeq !== undefined) {
+        headers[ACCOUNT_HEADER] = String(accountSeq);
+      }
       return await options.transport.send({
         method: "GET",
         url,
@@ -432,7 +453,10 @@ export function createReadonlyTossClient(
     }
   }
 
-  async function get<T>(request: TossGetRequest): Promise<TossHttpResult<T>> {
+  async function execute<T>(
+    request: TossGetRequest,
+    accountSeq?: number,
+  ): Promise<TossHttpResult<T>> {
     const { operation, path } = validateRequest(request);
     const url = createSafeUrl(options.environment, path, request.query);
     const responseType = request.responseType ?? "json";
@@ -449,7 +473,7 @@ export function createReadonlyTossClient(
       let response = await options.tokenManager.withAccessToken(
         async (accessToken) => {
           firstAccessToken = accessToken;
-          return send(url, accessToken, request.signal, operation);
+          return send(url, accessToken, request.signal, operation, accountSeq);
         },
       );
 
@@ -464,7 +488,7 @@ export function createReadonlyTossClient(
           context: { attempt, reason: "authentication" },
         });
         response = await options.tokenManager.withAccessToken((accessToken) =>
-          send(url, accessToken, request.signal, operation),
+          send(url, accessToken, request.signal, operation, accountSeq),
         );
         if (response.status === 401) {
           throw new TossHttpClientError(
@@ -512,5 +536,22 @@ export function createReadonlyTossClient(
     }
   }
 
-  return Object.freeze({ get });
+  async function get<T>(request: TossGetRequest): Promise<TossHttpResult<T>> {
+    return execute<T>(request);
+  }
+
+  async function getAccountScoped<T>(
+    request: TossAccountScopedGetRequest,
+  ): Promise<TossHttpResult<T>> {
+    if (!Number.isSafeInteger(request.accountSeq) || request.accountSeq <= 0) {
+      throw new TossHttpClientError(
+        "TOSS_GET_HEADER_NOT_ALLOWED",
+        false,
+        request.operation,
+      );
+    }
+    return execute<T>(request, request.accountSeq);
+  }
+
+  return Object.freeze({ get, getAccountScoped });
 }
