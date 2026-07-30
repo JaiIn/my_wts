@@ -1,4 +1,4 @@
-import { eq, lte, or } from "drizzle-orm";
+import { and, eq, lte, or } from "drizzle-orm";
 
 import type { AppDatabase } from "./database";
 import { type NewSessionRecord, type SessionRecord, sessions } from "./schema";
@@ -38,6 +38,22 @@ export class SessionRepository {
         .update(sessions)
         .set({ lastSeenAt })
         .where(eq(sessions.tokenHash, tokenHash))
+        .run().changes > 0
+    );
+  }
+
+  updateSelectedAccountRef(
+    tokenHash: string,
+    userId: string,
+    selectedAccountRef: string | null,
+  ): boolean {
+    return (
+      this.database
+        .update(sessions)
+        .set({ selectedAccountRef })
+        .where(
+          and(eq(sessions.tokenHash, tokenHash), eq(sessions.userId, userId)),
+        )
         .run().changes > 0
     );
   }
