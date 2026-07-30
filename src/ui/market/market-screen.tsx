@@ -144,9 +144,7 @@ function CalendarWidget({
               ))}
             </ul>
           )}
-          <p className="mt-4 text-xs text-slate-500">
-            고정 mock 일정 · 비실시간
-          </p>
+          <p className="mt-4 text-xs text-slate-500">조회 일정 · 비실시간</p>
         </div>
       )}
     </section>
@@ -204,8 +202,7 @@ function ExchangeRateWidget({
             </div>
           </dl>
           <p className="mt-4 text-xs leading-5 text-slate-500">
-            고정 mock 참고 환율 · 비실시간 · 실제 환전 또는 주문 적용 환율이
-            아닙니다.
+            참고 환율 · 비실시간 · 실제 환전 또는 주문 적용 환율이 아닙니다.
           </p>
         </div>
       )}
@@ -417,22 +414,25 @@ function WatchlistPanel({
         </p>
       ) : null}
       <p className="mt-4 text-xs text-slate-500">
-        로컬 사용자별 저장 · mock 시장 데이터 · 비실시간
+        로컬 사용자별 저장 · 시장 조회 데이터 · 비실시간
       </p>
     </section>
   );
 }
 
-function MarketHeader() {
+function MarketHeader({
+  liveReadEnabled,
+}: Readonly<{ liveReadEnabled: boolean }>) {
   return (
     <header>
       <p className="text-sm font-semibold tracking-wide text-blue-700">
-        MY WTS · LOCAL MOCK
+        {liveReadEnabled ? "MY WTS · LIVE READ-ONLY" : "MY WTS · LOCAL MOCK"}
       </p>
       <h1 className="mt-2 text-3xl font-bold tracking-tight">시장 홈</h1>
       <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-600">
-        종목 코드, 종목명 또는 시장을 검색해 고정 mock 현재가를 확인할 수
-        있습니다.
+        {liveReadEnabled
+          ? "Toss Open API의 참고용 조회 데이터입니다. 실시간 체결을 보장하지 않으며 실제 매수·매도·정정·취소 기능은 제공하지 않습니다."
+          : "종목 코드, 종목명 또는 시장을 검색해 고정 mock 현재가를 확인할 수 있습니다."}
       </p>
     </header>
   );
@@ -526,10 +526,12 @@ function WarningBanner({
 
 function PriceCard({
   error,
+  liveReadEnabled,
   price,
   stock,
 }: {
   error?: MarketScreenErrorView;
+  liveReadEnabled: boolean;
   price?: MarketPriceView;
   stock?: MarketStockView;
 }) {
@@ -574,7 +576,9 @@ function PriceCard({
     >
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
-          <p className="text-sm font-medium text-blue-700">MOCK DATA</p>
+          <p className="text-sm font-medium text-blue-700">
+            {liveReadEnabled ? "Toss Open API 조회 데이터" : "MOCK DATA"}
+          </p>
           <h2 id="current-price-title" className="mt-1 text-2xl font-semibold">
             {stock.displayName}
           </h2>
@@ -650,7 +654,7 @@ function OrderbookWidget({
           </p>
         </div>
         <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-700">
-          MOCK · 비실시간
+          조회 · 비실시간
         </span>
       </div>
 
@@ -769,7 +773,7 @@ function TradesWidget({
           </p>
         </div>
         <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-700">
-          MOCK · 비실시간
+          조회 · 비실시간
         </span>
       </div>
 
@@ -885,7 +889,7 @@ function CandleWidget({
           </p>
         </div>
         <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-700">
-          MOCK · 비실시간
+          조회 · 비실시간
         </span>
       </div>
 
@@ -1055,7 +1059,7 @@ function CandleWidget({
               </p>
             )}
             <p className="text-xs text-slate-500">
-              Cursor는 mock service가 제공한 값을 그대로 사용합니다.
+              Cursor는 BFF가 제공한 값을 그대로 사용합니다.
             </p>
           </div>
         </>
@@ -1074,6 +1078,7 @@ export type MarketScreenProps = MarketScreenData &
     onNextCandlePage?: () => void;
     onSymbolChange?: (symbol: string) => void;
     onWatchlistsChanged?: () => void | Promise<void>;
+    liveReadEnabled?: boolean;
     networkStatus?: "fetching" | "stale";
   }>;
 
@@ -1104,6 +1109,7 @@ export function MarketScreen({
   onNextCandlePage,
   onSymbolChange,
   onWatchlistsChanged,
+  liveReadEnabled = false,
   networkStatus,
 }: MarketScreenProps) {
   const inputId = useId();
@@ -1211,7 +1217,7 @@ export function MarketScreen({
   return (
     <main className="min-h-screen bg-slate-50 px-5 py-10 text-slate-950 sm:px-8">
       <div className="mx-auto grid w-full max-w-5xl gap-8">
-        <MarketHeader />
+        <MarketHeader liveReadEnabled={liveReadEnabled} />
         {networkStatus ? (
           <p role="status" className="text-sm text-slate-600">
             {networkStatus === "fetching"
@@ -1231,7 +1237,7 @@ export function MarketScreen({
           >
             <h2 className="text-lg font-semibold">표시할 종목이 없습니다.</h2>
             <p className="mt-2 text-sm text-slate-600">
-              mock 종목 데이터가 준비되면 다시 확인해 주세요.
+              종목 데이터가 준비되면 다시 확인해 주세요.
             </p>
           </section>
         ) : (
@@ -1337,6 +1343,7 @@ export function MarketScreen({
                 ) : null}
                 <PriceCard
                   error={selectedPriceError}
+                  liveReadEnabled={liveReadEnabled}
                   stock={selectedStock}
                   price={selectedPrice}
                 />

@@ -1,6 +1,9 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import {
+  LIVE_MARKET_BFF_SYMBOLS,
+  marketBootstrapSymbols,
+  MOCK_MARKET_BFF_SYMBOLS,
   getMarketCalendar,
   getMarketCandles,
   getMarketExchangeRate,
@@ -11,12 +14,37 @@ import {
   getMarketWarnings,
   MarketBffError,
 } from "../../src/ui/market/market-bff-client";
+
 import {
   candleStaleTime,
   MARKET_QUERY_TTL,
   marketQueryKeys,
   shouldRetryMarketQuery,
 } from "../../src/ui/market/market-query";
+
+describe("market bootstrap symbol plan", () => {
+  it("keeps deterministic mode-owned symbol sets without duplicates", () => {
+    expect(MOCK_MARKET_BFF_SYMBOLS).toEqual([
+      "005930",
+      "AAPL",
+      "EMPTY1",
+      "ERR1",
+      "FWD1",
+    ]);
+    expect(LIVE_MARKET_BFF_SYMBOLS).toEqual(["005930", "AAPL"]);
+    expect(marketBootstrapSymbols(false)).toBe(MOCK_MARKET_BFF_SYMBOLS);
+    expect(marketBootstrapSymbols(true)).toBe(LIVE_MARKET_BFF_SYMBOLS);
+    expect(new Set(MOCK_MARKET_BFF_SYMBOLS).size).toBe(
+      MOCK_MARKET_BFF_SYMBOLS.length,
+    );
+    expect(new Set(LIVE_MARKET_BFF_SYMBOLS).size).toBe(
+      LIVE_MARKET_BFF_SYMBOLS.length,
+    );
+    expect(LIVE_MARKET_BFF_SYMBOLS).not.toEqual(
+      expect.arrayContaining(["EMPTY1", "ERR1", "FWD1"]),
+    );
+  });
+});
 
 afterEach(() => {
   vi.unstubAllGlobals();

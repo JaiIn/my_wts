@@ -3,13 +3,24 @@
 import type { CandleInterval } from "../../domain/market/market";
 import type { Watchlist } from "../../domain/watchlist/watchlist";
 
-export const MARKET_BFF_SYMBOLS = Object.freeze([
+export const MOCK_MARKET_BFF_SYMBOLS = Object.freeze([
   "005930",
   "AAPL",
   "EMPTY1",
   "ERR1",
   "FWD1",
 ] as const);
+
+export const LIVE_MARKET_BFF_SYMBOLS = Object.freeze([
+  "005930",
+  "AAPL",
+] as const);
+
+export function marketBootstrapSymbols(
+  liveReadEnabled: boolean,
+): readonly string[] {
+  return liveReadEnabled ? LIVE_MARKET_BFF_SYMBOLS : MOCK_MARKET_BFF_SYMBOLS;
+}
 
 export type BffStock = Readonly<{
   symbol: string;

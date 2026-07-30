@@ -9,6 +9,11 @@ import {
 import { createTokenManager } from "./token-manager";
 
 type FetchFunction = typeof globalThis.fetch;
+const RUNTIME_CLIENT_KEY = Symbol.for("my_wts.runtimeReadonlyTossClient");
+
+type RuntimeGlobal = typeof globalThis & {
+  [RUNTIME_CLIENT_KEY]?: ReadonlyTossClient;
+};
 
 export function createRuntimeReadonlyTossClient(
   environment: ServerEnvironment,
@@ -51,4 +56,16 @@ export function createRuntimeReadonlyTossClient(
       },
     },
   });
+}
+
+export function getRuntimeReadonlyTossClient(
+  environment: ServerEnvironment,
+  fetchImplementation: FetchFunction,
+): ReadonlyTossClient {
+  const runtimeGlobal = globalThis as RuntimeGlobal;
+  runtimeGlobal[RUNTIME_CLIENT_KEY] ??= createRuntimeReadonlyTossClient(
+    environment,
+    fetchImplementation,
+  );
+  return runtimeGlobal[RUNTIME_CLIENT_KEY];
 }

@@ -16,6 +16,11 @@ describe("market browser network boundary", () => {
     );
     expect(page).toContain("MarketScreenBff");
     expect(page).toContain("MarketQueryProvider");
+    expect(page).toContain("liveReadEnabled");
+    expect(page).toContain("projectPublicServerEnvironment");
+    expect(page).not.toMatch(
+      /clientId|clientSecret|accessToken|tossApiBaseUrl|Authorization/,
+    );
   });
 
   it("keeps browser market code on typed relative BFF paths", () => {
@@ -34,6 +39,9 @@ describe("market browser network boundary", () => {
     );
     expect(sources).not.toMatch(
       /createOrder|modifyOrder|cancelOrder|createConditionalOrder|modifyConditionalOrder|cancelConditionalOrder/,
+    );
+    expect(sources).toMatch(
+      /LIVE_MARKET_BFF_SYMBOLS\s*=\s*Object\.freeze\(\s*\[\s*"005930",\s*"AAPL",?\s*\]/,
     );
     const marketTransport = readFileSync(
       resolve(root, "src/ui/market/market-bff-client.ts"),
