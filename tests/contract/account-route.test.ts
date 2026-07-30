@@ -42,6 +42,7 @@ function handler(
   provider: AccountProvider = createMockAccountProvider(),
   authentication: AccountAuthenticationContext = {
     userId: "usr_fixture",
+    tokenHash: "hash_fixture",
     sessionScope: "session-scope-fixture",
   },
 ) {
@@ -180,6 +181,7 @@ describe("GET /api/v1/accounts contract", () => {
         authenticator: {
           authenticate: () => ({
             userId: "usr_fixture",
+            tokenHash: `hash-${sessionScope}`,
             sessionScope,
           }),
         },
@@ -195,6 +197,40 @@ describe("GET /api/v1/accounts contract", () => {
     );
     expect(other.data.accounts[0].accountRef).not.toBe(
       first.data.accounts[0].accountRef,
+    );
+  });
+
+  it("projects only a registry-validated selected reference", async () => {
+    const provider = createMockAccountProvider(MOCK_SINGLE_ACCOUNT_ENVELOPE);
+    const registry = new AccountRefRegistry(
+      () => "acct_selected_contract_00000001",
+    );
+    const selection = {
+      resolveCurrent: vi.fn(() => ({
+        accountRef: "acct_selected_contract_00000001",
+        accountSeq: 101,
+      })),
+    };
+    const response = await createAccountBffHandler({
+      provider: () => ({ implementation: provider, name: "mock" }),
+      authenticator: {
+        authenticate: () => ({
+          userId: "usr_fixture",
+          tokenHash: "hash_fixture",
+          sessionScope: "scope_fixture",
+        }),
+      },
+      registry,
+      selection,
+      createRequestId: () => REQUEST_ID,
+      now: () => NOW,
+    })(request());
+    const body = await response.json();
+    expect(body.data.accounts[0]).toEqual(
+      expect.objectContaining({ selected: true }),
+    );
+    expect(JSON.stringify(body)).not.toMatch(
+      /accountSeq|["']accountNo["']\s*:/i,
     );
   });
 });

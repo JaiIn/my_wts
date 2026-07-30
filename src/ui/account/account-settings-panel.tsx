@@ -1,11 +1,13 @@
 "use client";
 
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { isKnownAccountType } from "../../domain/account/account";
 import {
   AccountBffError,
+  clearSelectedAccount,
   getAccounts,
+  selectAccount,
   type BffAccount,
 } from "./account-bff-client";
 
@@ -22,7 +24,15 @@ function accountTypeLabel(accountType: string): string {
     : "기타 계좌 유형";
 }
 
-function AccountList({ accounts }: { accounts: readonly BffAccount[] }) {
+function AccountList({
+  accounts,
+  disabled,
+  onSelect,
+}: {
+  accounts: readonly BffAccount[];
+  disabled: boolean;
+  onSelect(accountRef: string): void;
+}) {
   return (
     <ul aria-label="Toss 계좌 목록" className="mt-5 grid gap-3">
       {accounts.map((account) => (
@@ -30,7 +40,9 @@ function AccountList({ accounts }: { accounts: readonly BffAccount[] }) {
           key={account.accountRef}
           className="rounded-xl border border-slate-200 bg-white p-4"
         >
-          <p className="font-semibold">{accountTypeLabel(account.accountType)}</p>
+          <p className="font-semibold">
+            {accountTypeLabel(account.accountType)}
+          </p>
           <p className="mt-1 font-mono text-sm" data-testid="masked-account-no">
             {account.maskedAccountNo}
           </p>
@@ -39,7 +51,18 @@ function AccountList({ accounts }: { accounts: readonly BffAccount[] }) {
               지원 범위가 확장된 계좌 유형입니다.
             </p>
           ) : null}
-          <p className="mt-2 text-xs text-slate-500">선택되지 않음</p>
+          <p className="mt-2 text-sm font-medium text-slate-700">
+            {account.selected ? "현재 선택된 계좌" : "선택되지 않음"}
+          </p>
+          <button
+            type="button"
+            className="mt-3 rounded-lg border border-blue-700 bg-white px-3 py-2 text-sm font-semibold text-blue-800 disabled:cursor-not-allowed disabled:opacity-60"
+            disabled={disabled || account.selected}
+            aria-pressed={account.selected}
+            onClick={() => onSelect(account.accountRef)}
+          >
+            {account.selected ? "선택됨" : "이 계좌 선택"}
+          </button>
         </li>
       ))}
     </ul>
@@ -49,6 +72,7 @@ function AccountList({ accounts }: { accounts: readonly BffAccount[] }) {
 export function AccountSettingsPanel({
   liveReadEnabled,
 }: Readonly<{ liveReadEnabled: boolean }>) {
+  const queryClient = useQueryClient();
   const accountsQuery = useQuery({
     queryKey: ["accounts"],
     queryFn: ({ signal }) => getAccounts(signal),
@@ -62,6 +86,18 @@ export function AccountSettingsPanel({
     },
     staleTime: 0,
   });
+  const selectionMutation = useMutation({
+    mutationFn: async (accountRef: string | null) => {
+      if (accountRef === null) await clearSelectedAccount();
+      else await selectAccount(accountRef);
+    },
+    async onSuccess() {
+      await queryClient.invalidateQueries({ queryKey: ["accounts"] });
+    },
+  });
+  const selectedAccount = accountsQuery.data?.find(
+    (account) => account.selected,
+  );
 
   return (
     <main className="min-h-screen bg-slate-50 px-5 py-10 text-slate-950 sm:px-8">
@@ -114,7 +150,35 @@ export function AccountSettingsPanel({
               </p>
             </div>
           ) : (
-            <AccountList accounts={accountsQuery.data} />
+            <>
+              <AccountList
+                accounts={accountsQuery.data}
+                disabled={selectionMutation.isPending}
+                onSelect={(accountRef) => selectionMutation.mutate(accountRef)}
+              />
+              {selectedAccount ? (
+                <button
+                  type="button"
+                  className="mt-4 rounded-lg border border-slate-400 bg-white px-4 py-2 text-sm font-semibold disabled:opacity-60"
+                  disabled={selectionMutation.isPending}
+                  onClick={() => selectionMutation.mutate(null)}
+                >
+                  선택 해제
+                </button>
+              ) : (
+                <p role="status" className="mt-4 text-sm text-slate-600">
+                  사용할 계좌를 직접 선택해 주세요.
+                </p>
+              )}
+              {selectionMutation.isError ? (
+                <p
+                  role="alert"
+                  className="mt-3 rounded-lg border border-red-200 bg-red-50 p-3 text-sm"
+                >
+                  계좌 선택을 변경하지 못했습니다. 목록을 다시 확인해 주세요.
+                </p>
+              ) : null}
+            </>
           )}
 
           <button

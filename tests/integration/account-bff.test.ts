@@ -6,12 +6,16 @@ import { NextRequest } from "next/server";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { createAccountBffHandler } from "../../src/application/account/account-route";
+import { AccountSelectionService } from "../../src/application/account/account-selection-service";
+import { createAccountSelectionHandlers } from "../../src/application/account/account-selection-route";
 import { LoginService } from "../../src/application/auth/login-service";
+import { LogoutService } from "../../src/application/auth/logout-service";
 import { SessionService } from "../../src/application/auth/session-service";
 import { hashPassword } from "../../src/domain/auth/password";
 import { hashCanonicalSessionToken } from "../../src/domain/auth/session-token";
 import { AccountRefRegistry } from "../../src/infrastructure/account/account-ref-registry";
 import { SqliteLoginPersistence } from "../../src/infrastructure/auth/sqlite-login-persistence";
+import { SqliteLogoutPersistence } from "../../src/infrastructure/auth/sqlite-logout-persistence";
 import { SqliteSessionPersistence } from "../../src/infrastructure/auth/sqlite-session-persistence";
 import {
   applyMigrations,
@@ -21,6 +25,8 @@ import {
 } from "../../src/infrastructure/database/database";
 import { UserRepository } from "../../src/infrastructure/database/user-repository";
 import { createMockAccountProvider } from "../../src/infrastructure/account/mock-account-provider";
+import { SqliteAccountSelectionPersistence } from "../../src/infrastructure/account/sqlite-account-selection-persistence";
+import { SessionRepository } from "../../src/infrastructure/database/session-repository";
 import { createAuthProxy } from "../../proxy";
 
 const NOW = new Date("2026-07-30T06:00:00.000Z");
@@ -65,7 +71,7 @@ describe("account BFF session integration", () => {
           const user = sessionService.authenticate(token);
           const sessionScope = hashCanonicalSessionToken(token);
           if (!sessionScope) throw new Error("INVALID_TEST_SCOPE");
-          return { userId: user.id, sessionScope };
+          return { userId: user.id, tokenHash: sessionScope, sessionScope };
         },
       },
       registry,
@@ -100,7 +106,11 @@ describe("account BFF session integration", () => {
       authenticator: {
         authenticate(candidate) {
           const user = sessionService.authenticate(candidate);
-          return { userId: user.id, sessionScope: "scope" };
+          return {
+            userId: user.id,
+            tokenHash: "hash-scope",
+            sessionScope: "scope",
+          };
         },
       },
       registry: new AccountRefRegistry(),
@@ -135,6 +145,130 @@ describe("account BFF session integration", () => {
     );
   });
 
+  it("persists explicit selection per session, rejects cross-session refs, clears, and survives logout safely", async () => {
+    const firstToken = await createUserAndSession("selection", 55);
+    const secondToken = Buffer.alloc(32, 56).toString("base64url");
+    await new LoginService(new SqliteLoginPersistence(database), {
+      now: () => NOW,
+      createId: () => "session-selection-second",
+      createToken: () => secondToken,
+    }).login({
+      username: "account.selection",
+      password: "x".repeat(10),
+    });
+    const registry = new AccountRefRegistry(
+      (() => {
+        let index = 0;
+        return () => `acct_integration_selection_${++index}`.padEnd(32, "0");
+      })(),
+    );
+    const selection = new AccountSelectionService(
+      { authenticate: (token) => sessionService.authenticate(token) },
+      new SqliteAccountSelectionPersistence(database),
+      registry,
+    );
+    const firstContext = selection.authenticate(firstToken);
+    const secondContext = selection.authenticate(secondToken);
+    const accounts = [
+      {
+        accountNo: "00000001234",
+        accountSeq: 101,
+        accountType: "BROKERAGE",
+      },
+      {
+        accountNo: "00000005678",
+        accountSeq: 202,
+        accountType: "PENSION_SAVINGS",
+      },
+    ];
+    const firstRefs = registry.reconcile(firstContext.sessionScope, accounts);
+    const secondRefs = registry.reconcile(secondContext.sessionScope, accounts);
+    const firstRef = firstRefs.get(101)!;
+    const secondRef = secondRefs.get(202)!;
+    const handlers = createAccountSelectionHandlers(
+      selection,
+      () => REQUEST_ID,
+    );
+
+    expect(
+      (
+        await handlers.PUT(
+          selectionRequest("PUT", firstToken, { accountRef: firstRef }),
+        )
+      ).status,
+    ).toBe(204);
+    expect(
+      (
+        await handlers.PUT(
+          selectionRequest("PUT", secondToken, { accountRef: secondRef }),
+        )
+      ).status,
+    ).toBe(204);
+    expect(
+      new SessionRepository(database).findByTokenHash(
+        hashCanonicalSessionToken(firstToken)!,
+      )?.selectedAccountRef,
+    ).toBe(firstRef);
+    expect(
+      new SessionRepository(database).findByTokenHash(
+        hashCanonicalSessionToken(secondToken)!,
+      )?.selectedAccountRef,
+    ).toBe(secondRef);
+
+    const crossSession = await handlers.PUT(
+      selectionRequest("PUT", secondToken, { accountRef: firstRef }),
+    );
+    expect(crossSession.status).toBe(409);
+    expect((await crossSession.json()).error.code).toBe("ACCOUNT_REF_INVALID");
+
+    expect(
+      (await handlers.DELETE(selectionRequest("DELETE", firstToken))).status,
+    ).toBe(204);
+    expect(selection.resolveCurrent(firstContext)).toBeNull();
+    expect(selection.resolveCurrent(secondContext)?.accountRef).toBe(secondRef);
+
+    new LogoutService(new SqliteLogoutPersistence(database)).logout(
+      secondToken,
+    );
+    expect(
+      new SessionRepository(database).findByTokenHash(
+        hashCanonicalSessionToken(secondToken)!,
+      ),
+    ).toBeUndefined();
+  });
+
+  it("clears a stale process-memory reference while keeping the login session valid", async () => {
+    const token = await createUserAndSession("restart", 57);
+    const persistence = new SqliteAccountSelectionPersistence(database);
+    const originalRegistry = new AccountRefRegistry(
+      () => "acct_restart_reference_000000001",
+    );
+    const original = new AccountSelectionService(
+      { authenticate: (candidate) => sessionService.authenticate(candidate) },
+      persistence,
+      originalRegistry,
+    );
+    const context = original.authenticate(token);
+    const accountRef = originalRegistry
+      .reconcile(context.sessionScope, [
+        {
+          accountNo: "00000001234",
+          accountSeq: 101,
+          accountType: "BROKERAGE",
+        },
+      ])
+      .get(101)!;
+    original.select(token, accountRef);
+
+    const restarted = new AccountSelectionService(
+      { authenticate: (candidate) => sessionService.authenticate(candidate) },
+      persistence,
+      new AccountRefRegistry(),
+    );
+    expect(restarted.resolveCurrent(context)).toBeNull();
+    expect(sessionService.authenticate(token).id).toBe("usr_account_restart");
+  });
+
   function request(token?: string) {
     return new NextRequest("http://127.0.0.1:3000/api/v1/accounts", {
       headers: {
@@ -147,6 +281,23 @@ describe("account BFF session integration", () => {
   function pageRequest(path: string, token?: string) {
     return new NextRequest(`http://127.0.0.1:3000${path}`, {
       headers: token ? { Cookie: `my_wts_session=${token}` } : {},
+    });
+  }
+
+  function selectionRequest(
+    method: "PUT" | "DELETE",
+    token: string,
+    body?: { accountRef: string },
+  ) {
+    return new NextRequest("http://127.0.0.1:3000/api/v1/session/account", {
+      method,
+      headers: {
+        Host: "127.0.0.1:3000",
+        Origin: "http://127.0.0.1:3000",
+        Cookie: `my_wts_session=${token}`,
+        ...(body ? { "Content-Type": "application/json" } : {}),
+      },
+      body: body ? JSON.stringify(body) : undefined,
     });
   }
 

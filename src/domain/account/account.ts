@@ -17,11 +17,20 @@ export type PublicAccount = Readonly<{
   accountRef: string;
   maskedAccountNo: string;
   accountType: string;
-  selected: false;
+  selected: boolean;
 }>;
 
 export function isKnownAccountType(value: string): value is KnownAccountType {
   return KNOWN_ACCOUNT_TYPES.includes(value as KnownAccountType);
+}
+
+export function isCanonicalAccountRef(value: unknown): value is string {
+  return (
+    typeof value === "string" &&
+    value.length >= 16 &&
+    value.length <= 128 &&
+    /^[A-Za-z0-9_-]+$/.test(value)
+  );
 }
 
 export function maskAccountNo(accountNo: string): string {

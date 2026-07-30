@@ -4,10 +4,7 @@ import {
   SessionAuthenticationError,
   SessionPersistenceError,
 } from "../auth/session-service";
-import {
-  AccountProviderError,
-  type AccountProvider,
-} from "./account-provider";
+import { AccountProviderError, type AccountProvider } from "./account-provider";
 import {
   AccountContractError,
   maskAccountNo,
@@ -16,6 +13,10 @@ import {
 } from "../../domain/account/account";
 import { TossEnvelopeDecodeError } from "../../integrations/toss/envelope";
 import { TossHttpClientError } from "../../infrastructure/toss/readonly-http-client";
+import type {
+  AccountSelectionContext,
+  SelectedAccountResolution,
+} from "./account-selection-service";
 
 const SESSION_COOKIE_NAME = "my_wts_session";
 const LOOPBACK_HOST = "127.0.0.1:3000";
@@ -38,6 +39,7 @@ export class AccountRouteForbiddenError extends Error {
 
 export type AccountAuthenticationContext = Readonly<{
   userId: string;
+  tokenHash: string;
   sessionScope: string;
 }>;
 
@@ -54,6 +56,11 @@ export type AccountBffDependencies = Readonly<{
       sessionScope: string,
       accounts: readonly Account[],
     ): ReadonlyMap<number, string>;
+  };
+  selection?: {
+    resolveCurrent(
+      context: AccountSelectionContext,
+    ): SelectedAccountResolution | null;
   };
   createRequestId(): string;
   now(): Date;
@@ -73,6 +80,7 @@ function validateRequest(request: NextRequest): void {
 function publicAccounts(
   accounts: readonly Account[],
   references: ReadonlyMap<number, string>,
+  selectedAccountRef: string | null,
 ): readonly PublicAccount[] {
   return Object.freeze(
     accounts.map((account) => {
@@ -84,7 +92,7 @@ function publicAccounts(
         accountRef,
         maskedAccountNo: maskAccountNo(account.accountNo),
         accountType: account.accountType,
-        selected: false as const,
+        selected: accountRef === selectedAccountRef,
       });
     }),
   );
@@ -260,10 +268,15 @@ export function createAccountBffHandler(dependencies: AccountBffDependencies) {
       providerName = provider.name;
       const accounts = await provider.implementation.getAccounts();
       const references = dependencies.registry.reconcile(
-        `${authentication.userId}:${authentication.sessionScope}`,
+        authentication.sessionScope,
         accounts,
       );
-      const data = { accounts: publicAccounts(accounts, references) };
+      const selectedAccountRef =
+        dependencies.selection?.resolveCurrent(authentication)?.accountRef ??
+        null;
+      const data = {
+        accounts: publicAccounts(accounts, references, selectedAccountRef),
+      };
       dependencies.log?.("account.bff.succeeded", {
         requestId,
         operation: "getAccounts",

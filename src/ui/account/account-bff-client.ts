@@ -4,7 +4,7 @@ export type BffAccount = Readonly<{
   accountRef: string;
   maskedAccountNo: string;
   accountType: string;
-  selected: false;
+  selected: boolean;
 }>;
 
 export class AccountBffError extends Error {
@@ -43,7 +43,7 @@ function decodeAccount(value: unknown): BffAccount {
     typeof value.accountType !== "string" ||
     value.accountType.length < 1 ||
     value.accountType.length > 128 ||
-    value.selected !== false
+    typeof value.selected !== "boolean"
   ) {
     throw new AccountBffError("INVALID_BFF_RESPONSE", 502, false);
   }
@@ -51,13 +51,53 @@ function decodeAccount(value: unknown): BffAccount {
     accountRef: value.accountRef,
     maskedAccountNo: value.maskedAccountNo,
     accountType: value.accountType,
-    selected: false,
+    selected: value.selected,
   });
 }
 
-export async function getAccounts(signal?: AbortSignal): Promise<
-  readonly BffAccount[]
-> {
+async function decodeMutationError(response: Response): Promise<never> {
+  let body: unknown;
+  try {
+    body = await response.json();
+  } catch {
+    throw new AccountBffError("INVALID_BFF_RESPONSE", 502, false);
+  }
+  const error = isRecord(body) && isRecord(body.error) ? body.error : undefined;
+  throw new AccountBffError(
+    error && typeof error.code === "string" ? error.code : "BFF_REQUEST_FAILED",
+    response.status,
+    error?.retryable === true,
+    error && typeof error.requestId === "string" ? error.requestId : undefined,
+  );
+}
+
+export async function selectAccount(accountRef: string): Promise<void> {
+  const response = await fetch("/api/v1/session/account", {
+    method: "PUT",
+    credentials: "same-origin",
+    cache: "no-store",
+    headers: {
+      Accept: "application/json",
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ accountRef }),
+  });
+  if (response.status !== 204) await decodeMutationError(response);
+}
+
+export async function clearSelectedAccount(): Promise<void> {
+  const response = await fetch("/api/v1/session/account", {
+    method: "DELETE",
+    credentials: "same-origin",
+    cache: "no-store",
+    headers: { Accept: "application/json" },
+  });
+  if (response.status !== 204) await decodeMutationError(response);
+}
+
+export async function getAccounts(
+  signal?: AbortSignal,
+): Promise<readonly BffAccount[]> {
   const response = await fetch("/api/v1/accounts", {
     method: "GET",
     credentials: "same-origin",

@@ -4,6 +4,7 @@ import { randomBytes } from "node:crypto";
 
 import {
   AccountContractError,
+  isCanonicalAccountRef,
   type Account,
 } from "../../domain/account/account";
 
@@ -25,8 +26,7 @@ export class AccountRefRegistry {
   >();
 
   constructor(
-    private readonly createReference: AccountReferenceFactory =
-      createOpaqueReference,
+    private readonly createReference: AccountReferenceFactory = createOpaqueReference,
   ) {}
 
   reconcile(
@@ -58,17 +58,13 @@ export class AccountRefRegistry {
       if (!records.has(accountSeq)) {
         const accountRef = this.createReference();
         if (
-          accountRef.length < 16 ||
-          accountRef.length > 128 ||
+          !isCanonicalAccountRef(accountRef) ||
           String(accountSeq) === accountRef ||
           records.values().some((record) => record.accountRef === accountRef)
         ) {
           throw new AccountContractError("INVALID_ACCOUNT_REFERENCE");
         }
-        records.set(
-          accountSeq,
-          Object.freeze({ accountRef, accountSeq }),
-        );
+        records.set(accountSeq, Object.freeze({ accountRef, accountSeq }));
       }
     }
     this.scopes.set(sessionScope, records);
@@ -81,6 +77,7 @@ export class AccountRefRegistry {
   }
 
   resolve(sessionScope: string, accountRef: string): number | undefined {
+    if (!isCanonicalAccountRef(accountRef)) return undefined;
     for (const record of this.scopes.get(sessionScope)?.values() ?? []) {
       if (record.accountRef === accountRef) return record.accountSeq;
     }
