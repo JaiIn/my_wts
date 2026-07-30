@@ -80,7 +80,9 @@ function HoldingsTable({ items }: { items: readonly BffHolding[] }) {
   );
 }
 
-export function PortfolioPanel() {
+export function PortfolioPanel({
+  liveReadEnabled = false,
+}: Readonly<{ liveReadEnabled?: boolean }>) {
   const accountsQuery = useQuery({
     queryKey: ["accounts"],
     queryFn: ({ signal }) => getAccounts(signal),
@@ -109,6 +111,19 @@ export function PortfolioPanel() {
         <p className="mt-3 text-sm text-slate-600">
           선택한 계좌의 읽기 전용 보유자산입니다. 주문 기능은 제공하지 않습니다.
         </p>
+        <div
+          role="status"
+          className="mt-4 rounded-xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-950"
+        >
+          <p className="font-semibold">
+            {liveReadEnabled ? "Toss Open API 조회 데이터" : "MOCK DATA"}
+          </p>
+          <p className="mt-1">
+            {liveReadEnabled
+              ? "읽기 전용 참고 데이터입니다. 실제 주문 기능은 제공하지 않습니다."
+              : "결정론적 테스트 데이터입니다. 실제 Toss 조회나 주문 기능은 실행하지 않습니다."}
+          </p>
+        </div>
 
         <section
           aria-labelledby="holdings-title"

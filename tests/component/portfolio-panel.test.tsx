@@ -59,15 +59,30 @@ const holdings = {
   items: [holding],
 };
 
-function renderPanel() {
+function renderPanel(liveReadEnabled = false) {
   return render(
     <MarketQueryProvider>
-      <PortfolioPanel />
+      <PortfolioPanel liveReadEnabled={liveReadEnabled} />
     </MarketQueryProvider>,
   );
 }
 
 describe("portfolio panel", () => {
+  it("projects only the mock or live read-only data source state", async () => {
+    const fetch = vi.fn(async () => json({ data: { accounts: [] } }));
+    vi.stubGlobal("fetch", fetch);
+
+    const mock = renderPanel();
+    expect(await screen.findByText("MOCK DATA")).toBeTruthy();
+    expect(screen.queryByText("Toss Open API 조회 데이터")).toBeNull();
+    mock.unmount();
+
+    renderPanel(true);
+    expect(await screen.findByText("Toss Open API 조회 데이터")).toBeTruthy();
+    expect(screen.getByText(/실제 주문 기능은 제공하지 않습니다/)).toBeTruthy();
+    expect(screen.queryByText("MOCK DATA")).toBeNull();
+  });
+
   it("does not request holdings or auto-select when unselected", async () => {
     const fetch = vi.fn(async () =>
       json({
