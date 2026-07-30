@@ -11,11 +11,29 @@ describe("account read-only and browser boundary", () => {
       read("src/ui/account/account-settings-panel.tsx"),
       read("src/ui/account/holdings-bff-client.ts"),
       read("src/ui/account/portfolio-panel.tsx"),
+      read("src/ui/account/order-info-bff-client.ts"),
+      read("src/ui/account/order-info-panel.tsx"),
     ].join("\n");
     expect(browserSources).not.toMatch(
       /accountSeq|account-ref-registry|live-account-provider|runtime-account-provider|readonly-http-client|TokenManager|server-environment|process\.env|Authorization|Cookie|TOSS_CLIENT|openapi\.tossinvest\.com/i,
     );
     expect(browserSources).not.toMatch(/\baccountNo\b/);
+  });
+
+  it("keeps order information GET-only without order execution UI", () => {
+    const client = read("src/ui/account/order-info-bff-client.ts");
+    const panel = read("src/ui/account/order-info-panel.tsx");
+    const provider = read(
+      "src/infrastructure/account/live-order-info-provider.ts",
+    );
+    expect(client).toMatch(/order-info\/buying-power/);
+    expect(client).toMatch(/order-info\/sellable-quantity/);
+    expect(client).toMatch(/order-info\/commissions/);
+    expect(client).toContain('method: "GET"');
+    expect(client).not.toMatch(/accountSeq|accountRef|accountNo|https?:\/\//);
+    expect(provider).toContain("getAccountScoped");
+    expect(provider).not.toMatch(/createOrder|modifyOrder|cancelOrder/);
+    expect(panel).not.toMatch(/type="submit"|<form|useMutation|매수 버튼|매도 버튼/);
   });
 
   it("keeps holdings account scope server-only and read-only", () => {

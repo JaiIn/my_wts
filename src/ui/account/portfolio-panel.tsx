@@ -9,6 +9,7 @@ import {
   HoldingsBffError,
   type BffHolding,
 } from "./holdings-bff-client";
+import { OrderInfoPanel } from "./order-info-panel";
 
 function shouldRetry(failureCount: number, error: Error): boolean {
   const typed =
@@ -171,6 +172,7 @@ export function PortfolioPanel() {
             </>
           )}
         </section>
+        <OrderInfoPanel selectedAccountRef={selectedAccount?.accountRef} />
       </div>
     </main>
   );

@@ -7,6 +7,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { createAccountBffHandler } from "../../src/application/account/account-route";
 import { createHoldingsBffHandler } from "../../src/application/account/holdings-route";
+import { createOrderInfoBffHandler } from "../../src/application/account/order-info-route";
 import { AccountSelectionService } from "../../src/application/account/account-selection-service";
 import { createAccountSelectionHandlers } from "../../src/application/account/account-selection-route";
 import { LoginService } from "../../src/application/auth/login-service";
@@ -27,6 +28,7 @@ import {
 import { UserRepository } from "../../src/infrastructure/database/user-repository";
 import { createMockAccountProvider } from "../../src/infrastructure/account/mock-account-provider";
 import { createMockHoldingsProvider } from "../../src/infrastructure/account/mock-holdings-provider";
+import { createMockOrderInfoProvider } from "../../src/infrastructure/account/mock-order-info-provider";
 import { SqliteAccountSelectionPersistence } from "../../src/infrastructure/account/sqlite-account-selection-persistence";
 import { SessionRepository } from "../../src/infrastructure/database/session-repository";
 import { createAuthProxy } from "../../proxy";
@@ -215,6 +217,79 @@ describe("account BFF session integration", () => {
     );
     expect(blocked.status).toBe(409);
     expect((await blocked.json()).error.code).toBe("ACCOUNT_NOT_SELECTED");
+  });
+
+  it("isolates order information behind the current SQLite session selection", async () => {
+    const token = await createUserAndSession("order-info", 59);
+    const registry = new AccountRefRegistry(
+      () => "acct_order_info_integration_0001",
+    );
+    const selection = new AccountSelectionService(
+      { authenticate: (candidate) => sessionService.authenticate(candidate) },
+      new SqliteAccountSelectionPersistence(database),
+      registry,
+    );
+    const context = selection.authenticate(token);
+    const accountRef = registry
+      .reconcile(context.sessionScope, [
+        {
+          accountNo: "00000001234",
+          accountSeq: 101,
+          accountType: "BROKERAGE",
+        },
+      ])
+      .get(101)!;
+    selection.select(token, accountRef);
+    const provider = createMockOrderInfoProvider();
+    const dependencies = {
+      provider: () => ({ name: "mock" as const, implementation: provider }),
+      selection,
+      createRequestId: () => REQUEST_ID,
+      now: () => NOW,
+    };
+    const call = (path: string, operation: Parameters<typeof createOrderInfoBffHandler>[0]) =>
+      createOrderInfoBffHandler(operation, dependencies)(
+        new NextRequest(`http://127.0.0.1:3000${path}`, {
+          headers: {
+            Host: "127.0.0.1:3000",
+            Cookie: `my_wts_session=${token}`,
+          },
+        }),
+      );
+    expect(
+      (
+        await call(
+          "/api/v1/order-info/buying-power?currency=KRW",
+          "getBuyingPower",
+        )
+      ).status,
+    ).toBe(200);
+    expect(
+      (
+        await call(
+          "/api/v1/order-info/sellable-quantity?symbol=AAPL",
+          "getSellableQuantity",
+        )
+      ).status,
+    ).toBe(200);
+    const commissions = await call(
+      "/api/v1/order-info/commissions",
+      "getCommissions",
+    );
+    const serialized = JSON.stringify(await commissions.json());
+    expect(commissions.status).toBe(200);
+    expect(serialized).not.toMatch(
+      /accountSeq|accountRef|00000001234|authorization|cookie/i,
+    );
+    selection.clear(token);
+    expect(
+      (
+        await call(
+          "/api/v1/order-info/commissions",
+          "getCommissions",
+        )
+      ).status,
+    ).toBe(409);
   });
 
   it("persists explicit selection per session, rejects cross-session refs, clears, and survives logout safely", async () => {

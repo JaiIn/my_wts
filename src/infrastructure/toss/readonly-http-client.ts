@@ -57,14 +57,22 @@ export type TossGetRequest = Readonly<{
   headers?: Readonly<Record<string, string>>;
 }>;
 
-export type TossAccountScopedGetRequest = Readonly<{
-  path: "/api/v1/holdings";
-  operation: "getHoldings";
-  accountSeq: number;
-  query?: TossQuery;
-  responseType?: TossResponseType;
-  signal?: AbortSignal;
-}>;
+export type TossAccountScopedGetRequest = Readonly<
+  (
+    | { path: "/api/v1/holdings"; operation: "getHoldings" }
+    | { path: "/api/v1/buying-power"; operation: "getBuyingPower" }
+    | {
+        path: "/api/v1/sellable-quantity";
+        operation: "getSellableQuantity";
+      }
+    | { path: "/api/v1/commissions"; operation: "getCommissions" }
+  ) & {
+    accountSeq: number;
+    query?: TossQuery;
+    responseType?: TossResponseType;
+    signal?: AbortSignal;
+  }
+>;
 
 export type TossHttpTransportRequest = Readonly<{
   method: "GET";
@@ -546,6 +554,19 @@ export function createReadonlyTossClient(
     if (!Number.isSafeInteger(request.accountSeq) || request.accountSeq <= 0) {
       throw new TossHttpClientError(
         "TOSS_GET_HEADER_NOT_ALLOWED",
+        false,
+        request.operation,
+      );
+    }
+    const approvedOperations: Readonly<Record<string, string>> = {
+      "/api/v1/holdings": "getHoldings",
+      "/api/v1/buying-power": "getBuyingPower",
+      "/api/v1/sellable-quantity": "getSellableQuantity",
+      "/api/v1/commissions": "getCommissions",
+    };
+    if (approvedOperations[request.path] !== request.operation) {
+      throw new TossHttpClientError(
+        "TOSS_GET_PATH_NOT_ALLOWED",
         false,
         request.operation,
       );

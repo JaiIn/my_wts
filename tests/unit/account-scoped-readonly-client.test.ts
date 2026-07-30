@@ -58,4 +58,16 @@ describe("account-scoped readonly client", () => {
       expect(send).not.toHaveBeenCalled();
     },
   );
+
+  it("rejects mismatched account-scoped operation and path before transport", async () => {
+    const send = vi.fn<TossHttpTransport["send"]>();
+    await expect(
+      client(send).getAccountScoped({
+        path: "/api/v1/commissions",
+        operation: "getBuyingPower",
+        accountSeq: 101,
+      } as never),
+    ).rejects.toMatchObject({ code: "TOSS_GET_PATH_NOT_ALLOWED" });
+    expect(send).not.toHaveBeenCalled();
+  });
 });

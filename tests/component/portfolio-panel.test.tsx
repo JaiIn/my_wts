@@ -92,9 +92,9 @@ describe("portfolio panel", () => {
   });
 
   it("renders precise holdings through the same-origin BFF", async () => {
-    const fetch = vi.fn(async (url: string) =>
-      url === "/api/v1/accounts"
-        ? json({
+    const fetch = vi.fn(async (url: string) => {
+      if (url === "/api/v1/accounts") {
+        return json({
             data: {
               accounts: [
                 {
@@ -105,9 +105,17 @@ describe("portfolio panel", () => {
                 },
               ],
             },
-          })
-        : json({ data: holdings }),
-    );
+          });
+      }
+      if (url === "/api/v1/portfolio/holdings") {
+        return json({ data: holdings });
+      }
+      if (url.includes("buying-power")) {
+        return json({ data: { currency: "KRW", cashBuyingPower: "0" } });
+      }
+      if (url.includes("commissions")) return json({ data: [] });
+      return json({ data: { symbol: "AAPL", sellableQuantity: "0" } });
+    });
     vi.stubGlobal("fetch", fetch);
     renderPanel();
     expect(await screen.findByRole("table")).toBeTruthy();
@@ -118,7 +126,7 @@ describe("portfolio panel", () => {
       expect.objectContaining({ method: "GET", credentials: "same-origin" }),
     );
     expect(document.body.textContent).not.toMatch(
-      /accountSeq|accountNo|authorization|cookie|매수|매도|주문 수량/i,
+      /accountSeq|accountNo|authorization|cookie|주문 수량/i,
     );
   });
 
@@ -135,24 +143,25 @@ describe("portfolio panel", () => {
         ],
       },
     };
-    vi.stubGlobal(
-      "fetch",
-      vi
-        .fn()
-        .mockResolvedValueOnce(json(accountResponse))
-        .mockResolvedValueOnce(json({ data: { ...holdings, items: [] } })),
-    );
+    vi.stubGlobal("fetch", vi.fn(async (url: string) => {
+      if (url === "/api/v1/accounts") return json(accountResponse);
+      if (url === "/api/v1/portfolio/holdings") {
+        return json({ data: { ...holdings, items: [] } });
+      }
+      if (url.includes("buying-power")) {
+        return json({ data: { currency: "KRW", cashBuyingPower: "0" } });
+      }
+      if (url.includes("commissions")) return json({ data: [] });
+      return json({ data: { symbol: "AAPL", sellableQuantity: "0" } });
+    }));
     const empty = renderPanel();
     expect(await screen.findByText("보유 종목이 없습니다.")).toBeTruthy();
     empty.unmount();
 
-    vi.stubGlobal(
-      "fetch",
-      vi
-        .fn()
-        .mockResolvedValueOnce(json(accountResponse))
-        .mockResolvedValueOnce(
-          json(
+    vi.stubGlobal("fetch", vi.fn(async (url: string) => {
+      if (url === "/api/v1/accounts") return json(accountResponse);
+      if (url === "/api/v1/portfolio/holdings") {
+        return json(
             {
               error: {
                 code: "UPSTREAM_UNAVAILABLE",
@@ -161,9 +170,14 @@ describe("portfolio panel", () => {
               },
             },
             503,
-          ),
-        ),
-    );
+          );
+      }
+      if (url.includes("buying-power")) {
+        return json({ data: { currency: "KRW", cashBuyingPower: "0" } });
+      }
+      if (url.includes("commissions")) return json({ data: [] });
+      return json({ data: { symbol: "AAPL", sellableQuantity: "0" } });
+    }));
     renderPanel();
     expect(await screen.findByRole("alert")).toBeTruthy();
     expect(document.body.textContent).not.toMatch(/stack|sqlite|raw payload/i);
