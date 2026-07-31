@@ -146,10 +146,7 @@ export function validateOrderSizing(input: unknown): OrderSizing {
   }
 
   if (parsed.quantity !== undefined) {
-    if (
-      parsed.marketCountry === "KR" &&
-      !decimalFromString(parsed.quantity).isInteger()
-    ) {
+    if (parsed.marketCountry === "KR" && parsed.quantity.includes(".")) {
       throw new OrderSizingValidationError([
         { field: "quantity", code: "KR_QUANTITY_MUST_BE_INTEGER" },
       ]);

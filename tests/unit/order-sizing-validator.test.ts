@@ -127,16 +127,18 @@ describe("order simulation sizing validator", () => {
     },
   );
 
-  it("rejects fractional KR quantity while leaving US fractional eligibility to MS-07.02", () => {
-    expectValidationCodes(
-      {
-        marketCountry: "KR",
-        side: "SELL",
-        orderType: "MARKET",
-        quantity: "0.5",
-      },
-      ["KR_QUANTITY_MUST_BE_INTEGER"],
-    );
+  it("rejects non-lexical-integer KR quantity while leaving US fractional eligibility to MS-07.02", () => {
+    for (const quantity of ["0.5", "10.0"]) {
+      expectValidationCodes(
+        {
+          marketCountry: "KR",
+          side: "SELL",
+          orderType: "MARKET",
+          quantity,
+        },
+        ["KR_QUANTITY_MUST_BE_INTEGER"],
+      );
+    }
 
     expect(
       validateOrderSizing({
