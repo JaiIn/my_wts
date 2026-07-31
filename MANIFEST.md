@@ -1,9 +1,9 @@
 # Package Manifest
 
 Package: `my_wts-development-guide`  
-Generated: 2026-07-24  
-Revision: 6 (compatible dependency baseline + local authentication + read-only/no-order baseline)  
-Official API snapshot: Toss OpenAPI `1.2.4`
+Generated: 2026-07-31
+Revision: 7 (Toss OpenAPI 1.2.5 frozen baseline)
+Official API snapshot: Toss OpenAPI `1.2.5`
 
 ## Documents
 
@@ -46,12 +46,13 @@ Official API snapshot: Toss OpenAPI `1.2.4`
 | `references/source/official-api-reference-v1.2.4.md` | `7d669bb69f3e85808a999cd45d5e9914f075b4d72d12833c23911e09937594b3` |
 | `references/source/official-overview-v1.2.4.md` | `ea55335c6e10ff89bea2b941c0a8d41105d0d17fbff33a12bd391a3fd5e46cf3` |
 | `references/source/openapi-v1.2.4.json` | `7000d89ea3d783b0fa36d32e31750e85e139098306dbfce53a75fc4891019f1b` |
+| `references/source/openapi-v1.2.5.json` | `0f2cb7ef938fe1c50b7d69348705632ad488ea68d63fc762847f6c9485a3a111` |
 
 ## Frozen implementation contracts
 
 | File | SHA-256 |
 |---|---|
-| `specs/my-wts-bff-openapi.yaml` | `f8661e3310a3180e867cd437046cc327cafacd95085250843ec5e178d9bb4ede` |
+| `specs/my-wts-bff-openapi.yaml` | `de463c061fd68f23649131dea05fd89515f569bd7925f277ca65e2d822dcf1c1` |
 | `specs/sqlite-schema-v1.sql` | `e05e3f26862fc12631400d0c75e281d979b2b392a5d37def146b7e1e2d1a0931` |
 | `templates/.env.example` | `0db210cdb59ea2e20ca27d32a0b91cb3947969d54c8ea4574c10efe217f2798f` |
 

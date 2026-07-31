@@ -11,4 +11,6 @@ export const ACCOUNT_QUERY_TTL = Object.freeze({
 export const ACCOUNT_SCOPED_QUERY_KEYS = Object.freeze([
   "holdings",
   "order-info",
+  "orders",
+  "conditional-orders",
 ] as const);

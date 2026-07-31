@@ -50,7 +50,7 @@
 - [ ] 일반·조건주문 시뮬레이터
 - [ ] 시뮬레이터 상시 비실주문 표시
 - [ ] 내부 BFF spec과 구현 일치
-- [ ] Toss OpenAPI v1.2.4 GET contract
+- [ ] Toss OpenAPI v1.2.5 GET contract
 - [ ] 자격증명 없는 mock 실행
 - [ ] password/session/token/secret/accountSeq browser·log 비노출
 - [ ] SQLite migration 6개 table 재현

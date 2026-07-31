@@ -559,6 +559,42 @@ describe("market screen", () => {
     );
   });
 
+  it("renders watchlists delivered after the initial client render", async () => {
+    const data = await loadMarketScreen(createMockMarketService());
+    const emptyList: Watchlist = {
+      id: "00000000-0000-4000-8000-000000000024",
+      name: "기본 관심종목",
+      sortOrder: 0,
+      isDefault: true,
+      createdAt: "2026-07-28T00:00:00.000Z",
+      updatedAt: "2026-07-28T00:00:00.000Z",
+      items: [],
+    };
+    const hydratedList: Watchlist = {
+      ...emptyList,
+      items: [
+        {
+          symbol: "AAPL",
+          marketCountry: "US",
+          sortOrder: 0,
+          addedAt: "2026-07-28T00:00:00.000Z",
+        },
+      ],
+    };
+    const view = render(<MarketScreen {...data} watchlists={[]} />, {
+      wrapper: MarketQueryProvider,
+    });
+
+    view.rerender(<MarketScreen {...data} watchlists={[hydratedList]} />);
+
+    await waitFor(() =>
+      expect(
+        screen.getByRole("list", { name: "기본 관심종목" }),
+      ).toBeTruthy(),
+    );
+    expect(screen.getByText("AAPL", { selector: "span" })).toBeTruthy();
+  });
+
   it("keeps persisted items visible when a remove request fails", async () => {
     const data = await loadMarketScreen(createMockMarketService());
     const list: Watchlist = {

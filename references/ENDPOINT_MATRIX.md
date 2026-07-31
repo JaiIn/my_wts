@@ -1,6 +1,6 @@
-# Toss OpenAPI 1.2.4 Endpoint Matrix
+# Toss OpenAPI 1.2.5 Endpoint Matrix
 
-확인일: 2026-07-24  
+확인일: 2026-07-31
 Base URL: `https://openapi.tossinvest.com`
 
 총 27 paths, 30 operations.
@@ -61,4 +61,4 @@ createConditionalOrder, modifyConditionalOrder, cancelConditionalOrder
 | getBuyingPower | currency KRW/USD |
 | conditional create | expireDate/first 필수, OCO/OTO second 필수 |
 
-정확한 request/response schema와 예시는 `source/openapi-v1.2.4.json`을 최종 기준으로 사용한다. mutation 제약은 구현 지시가 아니라 공식 명세 기록이다.
+정확한 request/response schema와 예시는 `source/openapi-v1.2.5.json`을 최종 기준으로 사용한다. `source/openapi-v1.2.4.json`은 이전 기준의 역사 기록으로 보존한다. mutation 제약은 구현 지시가 아니라 공식 명세 기록이다.

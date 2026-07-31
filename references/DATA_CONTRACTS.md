@@ -132,4 +132,6 @@ server가 돌려준 cursor를 파싱·변형하지 않고 그대로 전달한다
 
 ## 10. Schema 목록
 
-OpenAPI `1.2.4`에는 72개 component schema가 있다. 전체 schema, required, enum, examples는 `source/openapi-v1.2.4.json`에 보존되어 있으며 code generation과 contract test의 source of truth이다.
+OpenAPI `1.2.5`에는 72개 component schema가 있다. 전체 schema, required, enum, examples는 `source/openapi-v1.2.5.json`에 보존되어 있으며 code generation과 contract test의 source of truth이다. 이전 `1.2.4` snapshot은 역사 기록으로 유지한다.
+
+`1.2.5`의 `PaginatedOrderResponse`는 `CLOSED` 주문이 `limit` 단위 cursor pagination을 사용한다고 설명하며, 기존 내부 `OPEN`/`CLOSED` 결정과 일치한다. `from`/`to`의 KST inclusive filter와 `OPEN` 비페이지네이션 계약은 변경하지 않는다.

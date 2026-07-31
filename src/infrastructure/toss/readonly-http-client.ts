@@ -66,6 +66,16 @@ export type TossAccountScopedGetRequest = Readonly<
         operation: "getSellableQuantity";
       }
     | { path: "/api/v1/commissions"; operation: "getCommissions" }
+    | { path: "/api/v1/orders"; operation: "getOrders" }
+    | { path: `/api/v1/orders/${string}`; operation: "getOrder" }
+    | {
+        path: "/api/v1/conditional-orders";
+        operation: "getConditionalOrders";
+      }
+    | {
+        path: `/api/v1/conditional-orders/${string}`;
+        operation: "getConditionalOrder";
+      }
   ) & {
     accountSeq: number;
     query?: TossQuery;
@@ -166,9 +176,9 @@ export type ReadonlyTossClient = Readonly<{
 
 export type AccountScopedReadonlyTossClient = ReadonlyTossClient &
   Readonly<{
-  getAccountScoped<T = unknown>(
-    request: TossAccountScopedGetRequest,
-  ): Promise<TossHttpResult<T>>;
+    getAccountScoped<T = unknown>(
+      request: TossAccountScopedGetRequest,
+    ): Promise<TossHttpResult<T>>;
   }>;
 
 function defaultScheduler(): TimeoutScheduler {
@@ -563,8 +573,22 @@ export function createReadonlyTossClient(
       "/api/v1/buying-power": "getBuyingPower",
       "/api/v1/sellable-quantity": "getSellableQuantity",
       "/api/v1/commissions": "getCommissions",
+      "/api/v1/orders": "getOrders",
+      "/api/v1/conditional-orders": "getConditionalOrders",
     };
-    if (approvedOperations[request.path] !== request.operation) {
+    const approvedDynamicOrder =
+      request.operation === "getOrder" &&
+      /^\/api\/v1\/orders\/[A-Za-z0-9_-]{1,128}$/.test(request.path);
+    const approvedDynamicConditionalOrder =
+      request.operation === "getConditionalOrder" &&
+      /^\/api\/v1\/conditional-orders\/[A-Za-z0-9_-]{1,128}$/.test(
+        request.path,
+      );
+    if (
+      approvedOperations[request.path] !== request.operation &&
+      !approvedDynamicOrder &&
+      !approvedDynamicConditionalOrder
+    ) {
       throw new TossHttpClientError(
         "TOSS_GET_PATH_NOT_ALLOWED",
         false,
