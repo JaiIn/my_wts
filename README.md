@@ -1,7 +1,7 @@
 # my_wts Development Guide
 
 작성일: 2026-07-24  
-공식 OpenAPI 기준 버전: `1.2.4`  
+공식 OpenAPI 기준 버전: `1.2.5`
 대상: Codex, AI coding agent, 초급 개발자  
 목표: 토스증권 Open API와 Next.js/React를 이용해 **로컬에서만 실행하는 WTS형 웹 애플리케이션**을 안전하게 개발한다.
 
@@ -62,7 +62,7 @@ Repository state on 2026-07-24: empty, no first commit
 
 ## 2. 문서 범위
 
-공식 OpenAPI `1.2.4`의 전체 범위를 확인했다.
+공식 OpenAPI `1.2.5`의 전체 범위를 확인했다.
 
 - 27개 path
 - 30개 operation
