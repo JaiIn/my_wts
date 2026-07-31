@@ -96,6 +96,49 @@ describe("account-scoped readonly client", () => {
     expect(blocked).not.toHaveBeenCalled();
   });
 
+  it("allows only conditional history GET list/detail paths", async () => {
+    const send = vi.fn<TossHttpTransport["send"]>().mockResolvedValue({
+      status: 200,
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ result: {} }),
+    });
+    const readonly = client(send);
+    await readonly.getAccountScoped({
+      path: "/api/v1/conditional-orders",
+      operation: "getConditionalOrders",
+      accountSeq: 101,
+      query: { status: "OPEN", limit: "20" },
+    });
+    await readonly.getAccountScoped({
+      path: "/api/v1/conditional-orders/opaque_Conditional-123",
+      operation: "getConditionalOrder",
+      accountSeq: 101,
+    });
+    expect(send).toHaveBeenCalledTimes(2);
+    expect(send.mock.calls[1]![0]).toMatchObject({
+      method: "GET",
+      url: expect.stringMatching(
+        /\/api\/v1\/conditional-orders\/opaque_Conditional-123$/,
+      ),
+    });
+
+    for (const path of [
+      "/api/v1/conditional-orders/opaque/modify",
+      "/api/v1/conditional-orders/opaque/cancel",
+      "/api/v1/conditional-orders/%2Fencoded",
+    ]) {
+      const blocked = vi.fn<TossHttpTransport["send"]>();
+      await expect(
+        client(blocked).getAccountScoped({
+          path,
+          operation: "getConditionalOrder",
+          accountSeq: 101,
+        } as never),
+      ).rejects.toMatchObject({ code: "TOSS_GET_PATH_NOT_ALLOWED" });
+      expect(blocked).not.toHaveBeenCalled();
+    }
+  });
+
   it.each([0, -1, 1.5, Number.MAX_SAFE_INTEGER + 1])(
     "rejects invalid account scope before transport: %s",
     async (accountSeq) => {

@@ -21,6 +21,7 @@ describe("account query policy", () => {
       "holdings",
       "order-info",
       "orders",
+      "conditional-orders",
     ]);
     expect(ACCOUNT_SCOPED_QUERY_KEYS).not.toContain("market");
   });

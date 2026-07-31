@@ -68,6 +68,14 @@ export type TossAccountScopedGetRequest = Readonly<
     | { path: "/api/v1/commissions"; operation: "getCommissions" }
     | { path: "/api/v1/orders"; operation: "getOrders" }
     | { path: `/api/v1/orders/${string}`; operation: "getOrder" }
+    | {
+        path: "/api/v1/conditional-orders";
+        operation: "getConditionalOrders";
+      }
+    | {
+        path: `/api/v1/conditional-orders/${string}`;
+        operation: "getConditionalOrder";
+      }
   ) & {
     accountSeq: number;
     query?: TossQuery;
@@ -566,13 +574,20 @@ export function createReadonlyTossClient(
       "/api/v1/sellable-quantity": "getSellableQuantity",
       "/api/v1/commissions": "getCommissions",
       "/api/v1/orders": "getOrders",
+      "/api/v1/conditional-orders": "getConditionalOrders",
     };
     const approvedDynamicOrder =
       request.operation === "getOrder" &&
       /^\/api\/v1\/orders\/[A-Za-z0-9_-]{1,128}$/.test(request.path);
+    const approvedDynamicConditionalOrder =
+      request.operation === "getConditionalOrder" &&
+      /^\/api\/v1\/conditional-orders\/[A-Za-z0-9_-]{1,128}$/.test(
+        request.path,
+      );
     if (
       approvedOperations[request.path] !== request.operation &&
-      !approvedDynamicOrder
+      !approvedDynamicOrder &&
+      !approvedDynamicConditionalOrder
     ) {
       throw new TossHttpClientError(
         "TOSS_GET_PATH_NOT_ALLOWED",

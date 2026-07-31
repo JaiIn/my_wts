@@ -10,6 +10,8 @@ import { createHoldingsBffHandler } from "../../src/application/account/holdings
 import { createOrderInfoBffHandler } from "../../src/application/account/order-info-route";
 import { createOrderHistoryBffHandler } from "../../src/application/orders/order-history-route";
 import { createOrderDetailBffHandler } from "../../src/application/orders/order-detail-route";
+import { buildConditionalOrderHistoryBffHandler } from "../../src/application/orders/conditional-order-route";
+import { buildConditionalOrderDetailBffHandler } from "../../src/application/orders/conditional-order-detail-route";
 import { AccountSelectionService } from "../../src/application/account/account-selection-service";
 import { createAccountSelectionHandlers } from "../../src/application/account/account-selection-route";
 import { LoginService } from "../../src/application/auth/login-service";
@@ -32,6 +34,7 @@ import { createMockAccountProvider } from "../../src/infrastructure/account/mock
 import { createMockHoldingsProvider } from "../../src/infrastructure/account/mock-holdings-provider";
 import { createMockOrderInfoProvider } from "../../src/infrastructure/account/mock-order-info-provider";
 import { createMockOrderHistoryProvider } from "../../src/infrastructure/orders/mock-order-history-provider";
+import { createMockConditionalOrderProvider } from "../../src/infrastructure/orders/mock-conditional-order-provider";
 import { SqliteAccountSelectionPersistence } from "../../src/infrastructure/account/sqlite-account-selection-persistence";
 import { SessionRepository } from "../../src/infrastructure/database/session-repository";
 import { createAuthProxy } from "../../proxy";
@@ -515,6 +518,100 @@ describe("account BFF session integration", () => {
     expect(tables).not.toContain("orders");
   });
 
+  it("isolates conditional list, detail, cursors, and triggered order links by session", async () => {
+    const firstToken = await createUserAndSession("conditional-first", 63);
+    const secondToken = await createUserAndSession("conditional-second", 64);
+    let referenceIndex = 0;
+    const registry = new AccountRefRegistry(() =>
+      `acct_conditional_${++referenceIndex}`.padEnd(32, "0"),
+    );
+    const selection = new AccountSelectionService(
+      { authenticate: (candidate) => sessionService.authenticate(candidate) },
+      new SqliteAccountSelectionPersistence(database),
+      registry,
+    );
+    const firstContext = selection.authenticate(firstToken);
+    const secondContext = selection.authenticate(secondToken);
+    const accounts = [
+      { accountNo: "00000001234", accountSeq: 101, accountType: "BROKERAGE" },
+      {
+        accountNo: "00000005678",
+        accountSeq: 202,
+        accountType: "PENSION_SAVINGS",
+      },
+    ];
+    selection.select(
+      firstToken,
+      registry.reconcile(firstContext.sessionScope, accounts).get(101)!,
+    );
+    selection.select(
+      secondToken,
+      registry.reconcile(secondContext.sessionScope, accounts).get(202)!,
+    );
+    const fetchSpy = vi.spyOn(globalThis, "fetch");
+    const provider = createMockConditionalOrderProvider();
+    const dependencies = {
+      provider: () => ({ implementation: provider, name: "mock" as const }),
+      selection,
+      createRequestId: () => REQUEST_ID,
+      now: () => NOW,
+    };
+    const list = buildConditionalOrderHistoryBffHandler(dependencies);
+    const detail = buildConditionalOrderDetailBffHandler(dependencies);
+
+    const firstPageResponse = await list(
+      conditionalRequest(firstToken, "?status=OPEN&limit=2"),
+    );
+    const firstPage = await firstPageResponse.json();
+    expect(firstPageResponse.status).toBe(200);
+    expect(firstPage.data.hasNext).toBe(true);
+    const nextPage = await list(
+      conditionalRequest(
+        firstToken,
+        `?status=OPEN&limit=2&cursor=${encodeURIComponent(
+          firstPage.data.nextCursor,
+        )}`,
+      ),
+    );
+    expect(nextPage.status).toBe(200);
+
+    const id = firstPage.data.conditionalOrders[0].conditionalOrderId;
+    const firstDetail = await detail(conditionalDetailRequest(firstToken, id), {
+      params: Promise.resolve({ conditionalOrderId: id }),
+    });
+    expect(firstDetail.status).toBe(200);
+    const detailBody = await firstDetail.json();
+    expect(detailBody.data.first).toBeDefined();
+    const triggered = firstPage.data.conditionalOrders.find(
+      (item: { first: { triggeredOrderId?: string | null } }) =>
+        item.first.triggeredOrderId,
+    );
+    if (triggered) {
+      expect(triggered.first.triggeredOrderId).toMatch(/^fixture-order-/);
+    }
+    const crossAccount = await detail(
+      conditionalDetailRequest(secondToken, id),
+      { params: Promise.resolve({ conditionalOrderId: id }) },
+    );
+    expect(crossAccount.status).toBe(404);
+    expect(
+      (await list(conditionalRequest(secondToken, "?status=OPEN"))).status,
+    ).toBe(200);
+
+    selection.clear(firstToken);
+    expect(
+      (await list(conditionalRequest(firstToken, "?status=CLOSED"))).status,
+    ).toBe(409);
+    expect(fetchSpy).not.toHaveBeenCalled();
+    const tables = database.$client
+      .prepare(
+        "SELECT name FROM sqlite_master WHERE type = 'table' ORDER BY name",
+      )
+      .all()
+      .map((row: unknown) => (row as { name: string }).name);
+    expect(tables).not.toContain("conditional_orders");
+  });
+
   function request(token?: string) {
     return new NextRequest("http://127.0.0.1:3000/api/v1/accounts", {
       headers: {
@@ -559,6 +656,32 @@ describe("account BFF session integration", () => {
   function orderDetailRequest(token: string, orderId: string) {
     return new NextRequest(
       `http://127.0.0.1:3000/api/v1/orders/${encodeURIComponent(orderId)}`,
+      {
+        headers: {
+          Host: "127.0.0.1:3000",
+          Cookie: `my_wts_session=${token}`,
+        },
+      },
+    );
+  }
+
+  function conditionalRequest(token: string, query: string) {
+    return new NextRequest(
+      `http://127.0.0.1:3000/api/v1/conditional-orders${query}`,
+      {
+        headers: {
+          Host: "127.0.0.1:3000",
+          Cookie: `my_wts_session=${token}`,
+        },
+      },
+    );
+  }
+
+  function conditionalDetailRequest(token: string, conditionalOrderId: string) {
+    return new NextRequest(
+      `http://127.0.0.1:3000/api/v1/conditional-orders/${encodeURIComponent(
+        conditionalOrderId,
+      )}`,
       {
         headers: {
           Host: "127.0.0.1:3000",
