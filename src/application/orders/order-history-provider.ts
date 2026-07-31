@@ -9,6 +9,7 @@ export type OrderHistoryProvider = Readonly<{
     accountSeq: number,
     query: OrderHistoryQuery,
   ): Promise<OrderHistoryPage>;
+  getOrder(accountSeq: number, orderId: string): Promise<ReadonlyOrder>;
 }>;
 
 export class OrderHistoryProviderError extends Error {
@@ -17,6 +18,7 @@ export class OrderHistoryProviderError extends Error {
   constructor(
     readonly code:
       | "INVALID_CURSOR"
+      | "ORDER_NOT_FOUND"
       | "UPSTREAM_AUTH_FAILED"
       | "UPSTREAM_RATE_LIMITED"
       | "UPSTREAM_TIMEOUT"

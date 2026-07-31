@@ -16,6 +16,7 @@ import {
   MOCK_ORDER_HISTORY_ACCOUNT_202,
 } from "./mock-order-history-fixtures";
 import { decodeOrderHistoryPage } from "./order-history-page-decoder";
+import { decodeOrderDetail } from "./order-history-page-decoder";
 
 export type MockOrderHistorySource = Readonly<
   Record<OrderHistoryGroup, unknown>
@@ -81,6 +82,7 @@ function cursorToken(signature: string, offset: number): string {
 
 export function createMockOrderHistoryProvider(
   sources: ReadonlyMap<number, MockOrderHistorySource> = DEFAULT_SOURCES,
+  detailOverrides: ReadonlyMap<string, unknown> = new Map(),
 ): OrderHistoryProvider {
   const cursors = new Map<string, CursorRecord>();
   return Object.freeze({
@@ -116,6 +118,27 @@ export function createMockOrderHistoryProvider(
         );
       }
       return cloneOrderHistoryPage({ orders, nextCursor, hasNext });
+    },
+    async getOrder(accountSeq, orderId) {
+      const override = detailOverrides.get(`${accountSeq}:${orderId}`);
+      if (override !== undefined) {
+        return decodeOrderDetail(override);
+      }
+      const source = sources.get(accountSeq) ?? MOCK_EMPTY_ORDER_HISTORY;
+      for (const group of ["OPEN", "CLOSED"] as const) {
+        const page = decodeOrderHistoryPage(source[group], group);
+        const order = page.orders.find(
+          (candidate) => candidate.orderId === orderId,
+        );
+        if (order) {
+          return cloneOrderHistoryPage({
+            orders: [order],
+            nextCursor: null,
+            hasNext: false,
+          }).orders[0]!;
+        }
+      }
+      throw new OrderHistoryProviderError("ORDER_NOT_FOUND");
     },
   });
 }

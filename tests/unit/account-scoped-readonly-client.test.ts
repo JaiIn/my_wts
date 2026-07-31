@@ -69,6 +69,33 @@ describe("account-scoped readonly client", () => {
     });
   });
 
+  it("allows an encoded-safe order detail GET and rejects mutation-like paths", async () => {
+    const send = vi.fn<TossHttpTransport["send"]>().mockResolvedValue({
+      status: 200,
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ result: {} }),
+    });
+    await client(send).getAccountScoped({
+      path: "/api/v1/orders/opaque_Order-123",
+      operation: "getOrder",
+      accountSeq: 101,
+    });
+    expect(send.mock.calls[0]![0]).toMatchObject({
+      method: "GET",
+      url: expect.stringMatching(/\/api\/v1\/orders\/opaque_Order-123$/),
+    });
+
+    const blocked = vi.fn<TossHttpTransport["send"]>();
+    await expect(
+      client(blocked).getAccountScoped({
+        path: "/api/v1/orders/opaque/modify",
+        operation: "getOrder",
+        accountSeq: 101,
+      } as never),
+    ).rejects.toMatchObject({ code: "TOSS_GET_PATH_NOT_ALLOWED" });
+    expect(blocked).not.toHaveBeenCalled();
+  });
+
   it.each([0, -1, 1.5, Number.MAX_SAFE_INTEGER + 1])(
     "rejects invalid account scope before transport: %s",
     async (accountSeq) => {

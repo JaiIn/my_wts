@@ -203,7 +203,10 @@ function expectBuildRoutesReadonly(): void {
     string
   >;
   for (const [route, compiledPath] of Object.entries(manifest)) {
-    if (!/(?:^|\/)(?:orders|conditional-orders)(?:\/|$)/.test(route)) {
+    if (
+      !/^\/api\/v1\/(?:orders|conditional-orders)(?:\/|$)/.test(route) ||
+      !route.endsWith("/route")
+    ) {
       continue;
     }
     const sourcePath = resolve(

@@ -11,7 +11,10 @@ import {
   TossEnvelopeDecodeError,
 } from "../../integrations/toss/envelope";
 import { tossPaginatedOrderResponseSchema } from "../../integrations/toss/order-history-schemas";
-import { decodeReadonlyOrder } from "./readonly-order-decoder";
+import {
+  decodeReadonlyOrder,
+  decodeReadonlyOrderEnvelope,
+} from "./readonly-order-decoder";
 
 function upstreamError(code: string): OrderHistoryProviderError {
   if (code === "rate-limit-exceeded") {
@@ -21,6 +24,16 @@ function upstreamError(code: string): OrderHistoryProviderError {
     return new OrderHistoryProviderError("UPSTREAM_AUTH_FAILED");
   }
   return new OrderHistoryProviderError("UPSTREAM_UNKNOWN_ERROR");
+}
+
+export function decodeOrderDetail(input: unknown) {
+  const envelope = decodeReadonlyOrderEnvelope(input);
+  if (!envelope.ok) throw upstreamError(envelope.error.code);
+  return cloneOrderHistoryPage({
+    orders: [envelope.result],
+    nextCursor: null,
+    hasNext: false,
+  }).orders[0]!;
 }
 
 export function decodeOrderHistoryPage(

@@ -17,7 +17,11 @@ describe("account query policy", () => {
   });
 
   it("invalidates only account-scoped portfolio query families", () => {
-    expect(ACCOUNT_SCOPED_QUERY_KEYS).toEqual(["holdings", "order-info"]);
+    expect(ACCOUNT_SCOPED_QUERY_KEYS).toEqual([
+      "holdings",
+      "order-info",
+      "orders",
+    ]);
     expect(ACCOUNT_SCOPED_QUERY_KEYS).not.toContain("market");
   });
 });

@@ -9,6 +9,7 @@ import { createAccountBffHandler } from "../../src/application/account/account-r
 import { createHoldingsBffHandler } from "../../src/application/account/holdings-route";
 import { createOrderInfoBffHandler } from "../../src/application/account/order-info-route";
 import { createOrderHistoryBffHandler } from "../../src/application/orders/order-history-route";
+import { createOrderDetailBffHandler } from "../../src/application/orders/order-detail-route";
 import { AccountSelectionService } from "../../src/application/account/account-selection-service";
 import { createAccountSelectionHandlers } from "../../src/application/account/account-selection-route";
 import { LoginService } from "../../src/application/auth/login-service";
@@ -153,6 +154,10 @@ describe("account BFF session integration", () => {
     expect(proxy(pageRequest("/portfolio")).headers.get("location")).toContain(
       "/login?next=%2Fportfolio",
     );
+    expect(proxy(pageRequest("/orders", token)).status).toBe(200);
+    expect(
+      proxy(pageRequest("/orders/opaque-order")).headers.get("location"),
+    ).toContain("/login?next=%2Forders%2Fopaque-order");
   });
 
   it("resolves the current session selection server-side before serving holdings", async () => {
@@ -467,6 +472,32 @@ describe("account BFF session integration", () => {
     );
     expect(fetchSpy).not.toHaveBeenCalled();
 
+    const detailHandler = createOrderDetailBffHandler({
+      provider: () => ({ implementation: provider, name: "mock" }),
+      selection,
+      createRequestId: () => REQUEST_ID,
+      now: () => NOW,
+    });
+    const detail = await detailHandler(
+      orderDetailRequest(firstToken, first.data.orders[0].orderId),
+      {
+        params: Promise.resolve({
+          orderId: first.data.orders[0].orderId,
+        }),
+      },
+    );
+    expect(detail.status).toBe(200);
+    expect((await detail.json()).data.execution).toBeDefined();
+    const crossAccount = await detailHandler(
+      orderDetailRequest(secondToken, first.data.orders[0].orderId),
+      {
+        params: Promise.resolve({
+          orderId: first.data.orders[0].orderId,
+        }),
+      },
+    );
+    expect(crossAccount.status).toBe(404);
+
     selection.clear(firstToken);
     expect(
       (await handler(orderRequest(firstToken, "?status=CLOSED"))).status,
@@ -523,6 +554,18 @@ describe("account BFF session integration", () => {
         Cookie: `my_wts_session=${token}`,
       },
     });
+  }
+
+  function orderDetailRequest(token: string, orderId: string) {
+    return new NextRequest(
+      `http://127.0.0.1:3000/api/v1/orders/${encodeURIComponent(orderId)}`,
+      {
+        headers: {
+          Host: "127.0.0.1:3000",
+          Cookie: `my_wts_session=${token}`,
+        },
+      },
+    );
   }
 
   async function createUserAndSession(label: string, tokenByte: number) {
