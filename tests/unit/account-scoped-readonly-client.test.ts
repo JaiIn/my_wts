@@ -11,8 +11,7 @@ function client(send: TossHttpTransport["send"]) {
   const clientId = ["fixture", "holdings", "client"].join("-");
   const clientSecret = ["fixture", "holdings", "credential"].join("-");
   const tokenManager: TokenManager = {
-    withAccessToken: async (consumer) =>
-      consumer("fixture-holdings-token"),
+    withAccessToken: async (consumer) => consumer("fixture-holdings-token"),
     invalidate: vi.fn(),
   };
   return createReadonlyTossClient({
@@ -42,6 +41,32 @@ describe("account-scoped readonly client", () => {
     expect(send).toHaveBeenCalledTimes(1);
     expect(send.mock.calls[0]![0].method).toBe("GET");
     expect(send.mock.calls[0]![0].headers["x-tossinvest-account"]).toBe("101");
+  });
+
+  it("allows only the account-scoped GET order history operation", async () => {
+    const send = vi.fn<TossHttpTransport["send"]>().mockResolvedValue({
+      status: 200,
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ result: { orders: [] } }),
+    });
+    await client(send).getAccountScoped({
+      path: "/api/v1/orders",
+      operation: "getOrders",
+      accountSeq: 101,
+      query: {
+        status: "CLOSED",
+        cursor: "opaque+cursor=",
+        limit: "20",
+      },
+    });
+    expect(send).toHaveBeenCalledTimes(1);
+    expect(send.mock.calls[0]![0]).toMatchObject({
+      method: "GET",
+      url: expect.stringContaining("/api/v1/orders?"),
+      headers: expect.objectContaining({
+        "x-tossinvest-account": "101",
+      }),
+    });
   });
 
   it.each([0, -1, 1.5, Number.MAX_SAFE_INTEGER + 1])(

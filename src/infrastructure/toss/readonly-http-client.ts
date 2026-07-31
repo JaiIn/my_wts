@@ -66,6 +66,7 @@ export type TossAccountScopedGetRequest = Readonly<
         operation: "getSellableQuantity";
       }
     | { path: "/api/v1/commissions"; operation: "getCommissions" }
+    | { path: "/api/v1/orders"; operation: "getOrders" }
   ) & {
     accountSeq: number;
     query?: TossQuery;
@@ -166,9 +167,9 @@ export type ReadonlyTossClient = Readonly<{
 
 export type AccountScopedReadonlyTossClient = ReadonlyTossClient &
   Readonly<{
-  getAccountScoped<T = unknown>(
-    request: TossAccountScopedGetRequest,
-  ): Promise<TossHttpResult<T>>;
+    getAccountScoped<T = unknown>(
+      request: TossAccountScopedGetRequest,
+    ): Promise<TossHttpResult<T>>;
   }>;
 
 function defaultScheduler(): TimeoutScheduler {
@@ -563,6 +564,7 @@ export function createReadonlyTossClient(
       "/api/v1/buying-power": "getBuyingPower",
       "/api/v1/sellable-quantity": "getSellableQuantity",
       "/api/v1/commissions": "getCommissions",
+      "/api/v1/orders": "getOrders",
     };
     if (approvedOperations[request.path] !== request.operation) {
       throw new TossHttpClientError(

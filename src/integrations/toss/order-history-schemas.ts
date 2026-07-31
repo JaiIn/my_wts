@@ -49,5 +49,14 @@ export const tossOrderSchema = z.looseObject({
   execution: tossOrderExecutionSchema,
 });
 
+export const tossPaginatedOrderResponseSchema = z.looseObject({
+  orders: z.array(tossOrderSchema),
+  nextCursor: z.string().nullable(),
+  hasNext: z.boolean(),
+});
+
 export type TossOrderDto = z.infer<typeof tossOrderSchema>;
 export type TossOrderExecutionDto = z.infer<typeof tossOrderExecutionSchema>;
+export type TossPaginatedOrderResponseDto = z.infer<
+  typeof tossPaginatedOrderResponseSchema
+>;

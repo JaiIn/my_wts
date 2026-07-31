@@ -105,3 +105,92 @@ export const MOCK_MALFORMED_SETTLEMENT_ORDER = deepFreeze({
     settlementDate: "2026-02-30",
   },
 });
+
+export const MOCK_ORDER_HISTORY_ACCOUNT_101 = deepFreeze({
+  OPEN: {
+    result: {
+      orders: [
+        MOCK_MARKET_AMOUNT_ORDER,
+        MOCK_ORDERS_BY_KNOWN_STATUS[3],
+        MOCK_ORDERS_BY_KNOWN_STATUS[2],
+        MOCK_ORDERS_BY_KNOWN_STATUS[1],
+        MOCK_ORDERS_BY_KNOWN_STATUS[0],
+      ],
+      nextCursor: null,
+      hasNext: false,
+    },
+  },
+  CLOSED: {
+    result: {
+      orders: [
+        MOCK_FILLED_ORDER,
+        MOCK_ORDERS_BY_KNOWN_STATUS[9],
+        MOCK_ORDERS_BY_KNOWN_STATUS[8],
+        MOCK_ORDERS_BY_KNOWN_STATUS[7],
+        MOCK_ORDERS_BY_KNOWN_STATUS[6],
+        MOCK_ORDERS_BY_KNOWN_STATUS[5],
+        MOCK_ORDERS_BY_KNOWN_STATUS[4],
+        MOCK_ORDERS_BY_KNOWN_STATUS[3],
+      ],
+      nextCursor: null,
+      hasNext: false,
+    },
+  },
+});
+
+export const MOCK_ORDER_HISTORY_ACCOUNT_202 = deepFreeze({
+  OPEN: {
+    result: {
+      orders: [
+        {
+          ...MOCK_ORDERS_BY_KNOWN_STATUS[0],
+          orderId: "fixture-account-202-open",
+          symbol: "ACCTB",
+          orderedAt: "2026-01-31T23:30:00-05:00",
+        },
+      ],
+      nextCursor: null,
+      hasNext: false,
+    },
+  },
+  CLOSED: {
+    result: {
+      orders: [
+        {
+          ...MOCK_ORDERS_BY_KNOWN_STATUS[4],
+          orderId: "fixture-account-202-closed",
+          symbol: "ACCTB",
+          orderedAt: "2026-02-01T04:30:00+00:00",
+        },
+      ],
+      nextCursor: null,
+      hasNext: false,
+    },
+  },
+});
+
+export const MOCK_EMPTY_ORDER_HISTORY = deepFreeze({
+  OPEN: {
+    result: { orders: [], nextCursor: null, hasNext: false },
+  },
+  CLOSED: {
+    result: { orders: [], nextCursor: null, hasNext: false },
+  },
+});
+
+export const MOCK_ORDER_HISTORY_ERROR = deepFreeze({
+  error: {
+    requestId: "mock-order-history-error",
+    code: "service-unavailable",
+    message: "Synthetic order history provider failure.",
+    data: {},
+  },
+});
+
+export const MOCK_MALFORMED_ORDER_HISTORY_PAGE = deepFreeze({
+  result: {
+    orders: [MOCK_MALFORMED_DECIMAL_ORDER],
+    nextCursor: null,
+    hasNext: false,
+  },
+});

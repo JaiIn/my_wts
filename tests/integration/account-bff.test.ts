@@ -8,6 +8,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createAccountBffHandler } from "../../src/application/account/account-route";
 import { createHoldingsBffHandler } from "../../src/application/account/holdings-route";
 import { createOrderInfoBffHandler } from "../../src/application/account/order-info-route";
+import { createOrderHistoryBffHandler } from "../../src/application/orders/order-history-route";
 import { AccountSelectionService } from "../../src/application/account/account-selection-service";
 import { createAccountSelectionHandlers } from "../../src/application/account/account-selection-route";
 import { LoginService } from "../../src/application/auth/login-service";
@@ -29,6 +30,7 @@ import { UserRepository } from "../../src/infrastructure/database/user-repositor
 import { createMockAccountProvider } from "../../src/infrastructure/account/mock-account-provider";
 import { createMockHoldingsProvider } from "../../src/infrastructure/account/mock-holdings-provider";
 import { createMockOrderInfoProvider } from "../../src/infrastructure/account/mock-order-info-provider";
+import { createMockOrderHistoryProvider } from "../../src/infrastructure/orders/mock-order-history-provider";
 import { SqliteAccountSelectionPersistence } from "../../src/infrastructure/account/sqlite-account-selection-persistence";
 import { SessionRepository } from "../../src/infrastructure/database/session-repository";
 import { createAuthProxy } from "../../proxy";
@@ -185,15 +187,12 @@ describe("account BFF session integration", () => {
       now: () => NOW,
     });
     const response = await handler(
-      new NextRequest(
-        "http://127.0.0.1:3000/api/v1/portfolio/holdings",
-        {
-          headers: {
-            Host: "127.0.0.1:3000",
-            Cookie: `my_wts_session=${token}`,
-          },
+      new NextRequest("http://127.0.0.1:3000/api/v1/portfolio/holdings", {
+        headers: {
+          Host: "127.0.0.1:3000",
+          Cookie: `my_wts_session=${token}`,
         },
-      ),
+      }),
     );
     const body = await response.json();
     expect(response.status).toBe(200);
@@ -205,15 +204,12 @@ describe("account BFF session integration", () => {
 
     selection.clear(token);
     const blocked = await handler(
-      new NextRequest(
-        "http://127.0.0.1:3000/api/v1/portfolio/holdings",
-        {
-          headers: {
-            Host: "127.0.0.1:3000",
-            Cookie: `my_wts_session=${token}`,
-          },
+      new NextRequest("http://127.0.0.1:3000/api/v1/portfolio/holdings", {
+        headers: {
+          Host: "127.0.0.1:3000",
+          Cookie: `my_wts_session=${token}`,
         },
-      ),
+      }),
     );
     expect(blocked.status).toBe(409);
     expect((await blocked.json()).error.code).toBe("ACCOUNT_NOT_SELECTED");
@@ -247,8 +243,14 @@ describe("account BFF session integration", () => {
       createRequestId: () => REQUEST_ID,
       now: () => NOW,
     };
-    const call = (path: string, operation: Parameters<typeof createOrderInfoBffHandler>[0]) =>
-      createOrderInfoBffHandler(operation, dependencies)(
+    const call = (
+      path: string,
+      operation: Parameters<typeof createOrderInfoBffHandler>[0],
+    ) =>
+      createOrderInfoBffHandler(
+        operation,
+        dependencies,
+      )(
         new NextRequest(`http://127.0.0.1:3000${path}`, {
           headers: {
             Host: "127.0.0.1:3000",
@@ -283,12 +285,7 @@ describe("account BFF session integration", () => {
     );
     selection.clear(token);
     expect(
-      (
-        await call(
-          "/api/v1/order-info/commissions",
-          "getCommissions",
-        )
-      ).status,
+      (await call("/api/v1/order-info/commissions", "getCommissions")).status,
     ).toBe(409);
   });
 
@@ -416,6 +413,77 @@ describe("account BFF session integration", () => {
     expect(sessionService.authenticate(token).id).toBe("usr_account_restart");
   });
 
+  it("isolates readonly order history by current session selection without persistence", async () => {
+    const firstToken = await createUserAndSession("orders-first", 61);
+    const secondToken = await createUserAndSession("orders-second", 62);
+    const registry = new AccountRefRegistry(
+      (() => {
+        let index = 0;
+        return () => `acct_order_history_${++index}`.padEnd(32, "0");
+      })(),
+    );
+    const selection = new AccountSelectionService(
+      { authenticate: (candidate) => sessionService.authenticate(candidate) },
+      new SqliteAccountSelectionPersistence(database),
+      registry,
+    );
+    const firstContext = selection.authenticate(firstToken);
+    const secondContext = selection.authenticate(secondToken);
+    const accounts = [
+      { accountNo: "00000001234", accountSeq: 101, accountType: "BROKERAGE" },
+      {
+        accountNo: "00000005678",
+        accountSeq: 202,
+        accountType: "PENSION_SAVINGS",
+      },
+    ];
+    const firstRef = registry
+      .reconcile(firstContext.sessionScope, accounts)
+      .get(101)!;
+    const secondRef = registry
+      .reconcile(secondContext.sessionScope, accounts)
+      .get(202)!;
+    selection.select(firstToken, firstRef);
+    selection.select(secondToken, secondRef);
+    const fetchSpy = vi.spyOn(globalThis, "fetch");
+    const provider = createMockOrderHistoryProvider();
+    const handler = createOrderHistoryBffHandler({
+      provider: () => ({ implementation: provider, name: "mock" }),
+      selection,
+      createRequestId: () => REQUEST_ID,
+      now: () => NOW,
+    });
+
+    const first = await (
+      await handler(orderRequest(firstToken, "?status=OPEN"))
+    ).json();
+    const second = await (
+      await handler(orderRequest(secondToken, "?status=OPEN"))
+    ).json();
+    expect(first.data.orders).toHaveLength(5);
+    expect(second.data.orders).toHaveLength(1);
+    expect(first.data.orders[0].orderId).not.toBe(
+      second.data.orders[0].orderId,
+    );
+    expect(fetchSpy).not.toHaveBeenCalled();
+
+    selection.clear(firstToken);
+    expect(
+      (await handler(orderRequest(firstToken, "?status=CLOSED"))).status,
+    ).toBe(409);
+    expect(
+      (await handler(orderRequest(secondToken, "?status=CLOSED"))).status,
+    ).toBe(200);
+
+    const tables = database.$client
+      .prepare(
+        "SELECT name FROM sqlite_master WHERE type = 'table' ORDER BY name",
+      )
+      .all()
+      .map((row: unknown) => (row as { name: string }).name);
+    expect(tables).not.toContain("orders");
+  });
+
   function request(token?: string) {
     return new NextRequest("http://127.0.0.1:3000/api/v1/accounts", {
       headers: {
@@ -445,6 +513,15 @@ describe("account BFF session integration", () => {
         ...(body ? { "Content-Type": "application/json" } : {}),
       },
       body: body ? JSON.stringify(body) : undefined,
+    });
+  }
+
+  function orderRequest(token: string, query: string) {
+    return new NextRequest(`http://127.0.0.1:3000/api/v1/orders${query}`, {
+      headers: {
+        Host: "127.0.0.1:3000",
+        Cookie: `my_wts_session=${token}`,
+      },
     });
   }
 
