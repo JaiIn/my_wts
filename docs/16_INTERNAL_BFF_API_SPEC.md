@@ -67,7 +67,7 @@ Time: ISO 8601 offset
 {
   "data": {
     "appVersion": "1.0.0",
-    "tossOpenApiVersion": "1.2.4",
+    "tossOpenApiVersion": "1.2.5",
     "liveReadEnabled": false,
     "authenticated": true,
     "accountSelected": false,
