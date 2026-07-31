@@ -2,7 +2,7 @@
 
 Package: `my_wts-development-guide`  
 Generated: 2026-07-31
-Revision: 8 (M07 simulation order rules)
+Revision: 9 (M07 simulation calculation policy)
 Official API snapshot: Toss OpenAPI `1.2.5`
 
 ## Documents
@@ -52,7 +52,7 @@ Official API snapshot: Toss OpenAPI `1.2.5`
 
 | File | SHA-256 |
 |---|---|
-| `specs/my-wts-bff-openapi.yaml` | `d0db84e66943a4d6611d3fba150fe362167f78d852e2acd949ad20443c22fe57` |
+| `specs/my-wts-bff-openapi.yaml` | `210e8ff526d603a133cfccdc39556439822b18b74ffb306217a46633613dae29` |
 | `specs/sqlite-schema-v1.sql` | `e05e3f26862fc12631400d0c75e281d979b2b392a5d37def146b7e1e2d1a0931` |
 | `templates/.env.example` | `0db210cdb59ea2e20ca27d32a0b91cb3947969d54c8ea4574c10efe217f2798f` |
 

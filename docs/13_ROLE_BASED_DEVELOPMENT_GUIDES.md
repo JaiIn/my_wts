@@ -122,6 +122,11 @@ cancelConditionalOrder
 - 금액 주문은 미국 MARKET `BUY`/`SELL`이며 TIF·price·quantity를 받지 않음
 - 국내 지정가는 KRX 구간별 호가 단위를 Decimal로 검증하고 가격을 보정하지 않음
 - 정규장 여부는 request body가 아닌 trusted server-side context로 검증
+- 계산은 native currency만 사용하고 FX·세금을 추정하지 않음
+- 수량 LIMIT은 검증된 price, 수량 MARKET은 같은 operation의 trusted `PriceResponse.lastPrice`, 금액 MARKET은 `orderAmount`를 gross로 사용
+- 수수료율은 퍼센트 단위이며 trusted KST 기준일에 시장·기간이 일치하는 정확히 한 rule만 적용
+- BUY는 gross+commission 현금 유출, SELL은 gross-commission 세전 현금 유입
+- Decimal 계산값은 반올림·절삭하지 않고 30자 이내 canonical plain decimal로 반환
 
 금지: preview ID, clientOrderId, 주문 제출, background 감시, 결과 저장.
 

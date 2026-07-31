@@ -110,6 +110,12 @@ type AmountOrder = {
 
 시뮬레이션 결과는 `SIMULATION_ONLY`, `submitted=false`, `persisted=false`이고 실제 주문을 제출하거나 저장하지 않는다.
 
+일반 주문 시뮬레이션은 시장 native currency(`KRW`/`USD`)만 사용하며 FX와 세금을 적용하지 않는다. 수량 LIMIT의 gross는 `price × quantity`, 수량 MARKET은 같은 server operation에서 조회한 trusted `PriceResponse.lastPrice × quantity`, 금액 MARKET은 `orderAmount`다. MARKET reference price와 그 timestamp, KST 계산 기준일, commission rule은 Browser payload가 아닌 trusted server-side context다.
+
+`commissionRate`는 퍼센트 단위다. 수수료는 `gross × commissionRate ÷ 100`이고, trusted KST 기준일에 시장과 inclusive 적용 기간이 일치하는 정확히 한 rule만 사용한다. BUY cash amount는 gross+commission, SELL은 세금 차감 전 gross-commission이다. `taxIncluded=false`, `fxApplied=false`이며 tax·FX 값을 추정하지 않는다.
+
+계산은 충분한 precision의 Decimal exact arithmetic으로 수행하며 중간값과 최종값을 반올림·절삭하지 않는다. canonical plain decimal 출력이 30자를 넘으면 값을 보정하지 않고 실패한다.
+
 ## 7. Order status
 
 ```text

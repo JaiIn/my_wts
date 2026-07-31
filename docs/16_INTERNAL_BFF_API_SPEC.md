@@ -201,9 +201,16 @@ unknown enum은 원문을 보존한다. 정정·취소 action은 제공하지 �
     "kind": "SIMULATION_ONLY",
     "symbol": "005930",
     "side": "BUY",
-    "estimatedNotional": "700000",
-    "commissionEstimate": "105",
     "currency": "KRW",
+    "sizingMode": "QUANTITY",
+    "estimatedOrderAmount": "700000",
+    "estimatedCommission": "105",
+    "estimatedCashAmount": "700105",
+    "cashDirection": "OUTFLOW",
+    "taxIncluded": false,
+    "fxApplied": false,
+    "calculationPrice": "70000",
+    "referencePriceAsOf": null,
     "warnings": [],
     "submitted": false,
     "persisted": false
@@ -224,7 +231,11 @@ unknown enum은 원문을 보존한다. 정정·취소 action은 제공하지 �
 - 미국 소수 수량과 금액 주문의 정규장 여부는 request body가 아닌 trusted server-side context로 검증
 - 국내 지정가는 KRX 구간별 호가 단위를 적용하며 자동 반올림·절삭·보정하지 않음
 
-응답은 항상 `SIMULATION_ONLY`, `submitted=false`, `persisted=false`이고 실제 주문 제출이나 저장을 수행하지 않는다.
+request body는 reference price, reference price timestamp/currency, calculation date, commission rule 또는 환율을 받지 않는다. 수량 MARKET의 기준 가격은 같은 operation에서 server-side로 조회한 `PriceResponse.lastPrice`이고, 금액 MARKET은 `orderAmount`를 gross로 사용한다.
+
+계산 통화는 `KRW` 또는 `USD` native currency다. 환율과 세금을 적용하지 않아 `fxApplied=false`, `taxIncluded=false`이다. 수수료율은 퍼센트 단위이며 trusted KST 기준일에 시장·inclusive 적용 기간이 일치하는 정확히 한 rule로 계산한다. BUY의 cash amount는 gross+commission, SELL은 세금 차감 전 gross-commission이다.
+
+Decimal 중간값과 최종값은 반올림·절삭하지 않는다. 출력은 최대 30자의 canonical plain decimal이고 초과값은 오류다. 응답은 항상 `SIMULATION_ONLY`, `submitted=false`, `persisted=false`이고 실제 주문 제출이나 저장을 수행하지 않는다.
 
 ## 9. 조건주문 시뮬레이터
 

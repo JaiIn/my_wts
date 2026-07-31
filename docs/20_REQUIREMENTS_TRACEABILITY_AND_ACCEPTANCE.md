@@ -17,7 +17,7 @@
 | 주문정보 | portfolio/simulator | order-info GET | M05/M07 | decimal |
 | 주문내역 | orders | orders GET | M06 | status+cursor |
 | 조건주문내역 | conditional | conditional GET | M06 | type+cursor |
-| 일반 시뮬레이터 | trade | simulation | M07 | calculation+safety |
+| 일반 시뮬레이터 | trade | simulation | M07 | native-currency exact calculation+commission+safety |
 | 랭킹·지표 | rankings/indicators | market | M08 | contract+E2E |
 | 조건 시뮬레이터 | conditional simulator | simulation | M09 | validator+safety |
 | diagnostics | diagnostics | system/audit | M10 | redaction |
@@ -34,7 +34,7 @@
 | M04 | 승인된 최소 live 시장 조회, OFF regression |
 | M05 | Toss 계좌 선택·holdings·order-info read-only |
 | M06 | 일반·조건주문 내역 read-only |
-| M07 | 일반 주문 시뮬레이터, mutation network 0 |
+| M07 | native currency·trusted reference price·기간별 commission의 exact 일반 주문 시뮬레이터, tax/FX·mutation network 0 |
 | M08 | 랭킹·시장지표 |
 | M09 | 조건주문 시뮬레이터, 감시·trigger 없음 |
 | M10 | 전체 test/build/security/runbook |

@@ -392,7 +392,7 @@ paths:
           description: Simulation result
           content:
             application/json:
-              schema: { $ref: "#/components/schemas/SimulationResponse" }
+              schema: { $ref: "#/components/schemas/OrderSimulationResponse" }
         "400": { $ref: "#/components/responses/BadRequest" }
         "401": { $ref: "#/components/responses/Unauthorized" }
         "409": { $ref: "#/components/responses/Conflict" }
@@ -644,6 +644,53 @@ components:
             submitted: { type: boolean, const: false }
             persisted: { type: boolean, const: false }
         meta: { $ref: "#/components/schemas/Meta" }
+    OrderSimulationResponse:
+      type: object
+      additionalProperties: false
+      required: [data, meta]
+      properties:
+        data:
+          type: object
+          additionalProperties: false
+          required:
+            - kind
+            - currency
+            - sizingMode
+            - estimatedOrderAmount
+            - estimatedCommission
+            - estimatedCashAmount
+            - cashDirection
+            - taxIncluded
+            - fxApplied
+            - calculationPrice
+            - referencePriceAsOf
+            - submitted
+            - persisted
+          properties:
+            kind: { type: string, const: SIMULATION_ONLY }
+            currency: { type: string, enum: [KRW, USD] }
+            sizingMode: { type: string, enum: [QUANTITY, AMOUNT] }
+            estimatedOrderAmount: { $ref: "#/components/schemas/CalculatedDecimal" }
+            estimatedCommission: { $ref: "#/components/schemas/CalculatedDecimal" }
+            estimatedCashAmount: { $ref: "#/components/schemas/CalculatedDecimal" }
+            cashDirection: { type: string, enum: [OUTFLOW, INFLOW] }
+            taxIncluded: { type: boolean, const: false }
+            fxApplied: { type: boolean, const: false }
+            calculationPrice:
+              oneOf:
+                - { $ref: "#/components/schemas/CalculatedDecimal" }
+                - { type: "null" }
+            referencePriceAsOf:
+              oneOf:
+                - { type: string, format: date-time }
+                - { type: "null" }
+            submitted: { type: boolean, const: false }
+            persisted: { type: boolean, const: false }
+        meta: { $ref: "#/components/schemas/Meta" }
+    CalculatedDecimal:
+      type: string
+      maxLength: 30
+      pattern: "^(?:0|[1-9][0-9]*)(?:\\.[0-9]*[1-9])?$"
     WatchlistRequest:
       type: object
       additionalProperties: false

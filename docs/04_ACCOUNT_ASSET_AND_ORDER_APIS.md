@@ -236,9 +236,13 @@ symbol / name / market
 side / orderType / timeInForce
 quantity xor orderAmount
 price
-estimatedNotional
+estimatedOrderAmount
 currency
-commissionEstimate
+estimatedCommission
+estimatedCashAmount / cashDirection
+taxIncluded = false
+fxApplied = false
+calculationPrice / referencePriceAsOf
 buyingPower or sellableQuantity
 warnings
 submitted = false
@@ -248,3 +252,11 @@ persisted = false
 simulation ID, confirmation text, 만료, consume, submit 단계는 없다.
 
 시뮬레이션 validator는 가격·수량 원문을 반올림하거나 절삭하지 않는다. 결과는 항상 `SIMULATION_ONLY`, `submitted=false`, `persisted=false`이며 실제 제출·저장은 없다.
+
+계산 통화는 주문 시장의 native currency(`KR`은 `KRW`, `US`는 `USD`)이며 환율을 적용하지 않는다. `fxApplied=false`이고 서로 다른 통화의 입력은 거부한다. 수량 LIMIT의 계산 가격은 검증된 지정가이고, 수량 MARKET은 같은 simulation operation에서 server-side `PriceResponse.lastPrice`로 조회한 양수 decimal과 그 `timestamp`를 사용한다. 브라우저는 reference price, 조회 시각, 계산 기준일 또는 commission rule을 전달할 수 없다. 금액 MARKET은 `orderAmount` 자체가 gross 기준이며 예상 수량을 만들지 않는다.
+
+수량 주문의 `estimatedOrderAmount`는 `calculationPrice × quantity`, 금액 주문은 `orderAmount`다. `commissionRate`는 퍼센트 단위이므로 `estimatedCommission = estimatedOrderAmount × commissionRate ÷ 100`으로 계산한다. 수수료 rule은 trusted KST 계산 기준일에 `marketCountry`와 적용 기간이 일치하는 정확히 한 건이어야 하며 `startDate`/`endDate`의 null은 해당 방향 제한이 없다는 뜻이다. 기간 경계는 inclusive이고 0건 또는 중복은 안전하게 실패한다.
+
+BUY는 `estimatedCashAmount = estimatedOrderAmount + estimatedCommission`, `cashDirection=OUTFLOW`이다. SELL은 `estimatedCashAmount = estimatedOrderAmount - estimatedCommission`, `cashDirection=INFLOW`이며 세금 차감 전 예상 수령액이다. 세금은 추정하지 않고 `taxIncluded=false`이며 `estimatedTax`를 생성하지 않는다.
+
+모든 계산은 충분한 precision의 Decimal exact arithmetic을 사용하고 중간값과 최종값을 반올림·절삭하지 않는다. 출력은 scientific notation이 아닌 canonical plain decimal이며 불필요한 trailing zero를 제거한다. 최종 decimal 문자열이 30자를 넘으면 값을 보정하지 않고 실패한다. MARKET reference price 또는 적용 commission rule이 없거나 malformed/통화 불일치이면 부분 숫자 결과를 반환하지 않는다.
