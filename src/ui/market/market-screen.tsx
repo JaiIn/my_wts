@@ -232,10 +232,14 @@ function WatchlistPanel({
   selectedStock?: MarketStockView;
   stocks: readonly MarketStockView[];
 }) {
-  const [watchlists, setWatchlists] = useState(initialWatchlists);
+  const [localWatchlists, setWatchlists] = useState(initialWatchlists);
   const [busyKey, setBusyKey] = useState("");
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
+  const watchlists =
+    localWatchlists.length === 0 && initialWatchlists.length > 0
+      ? initialWatchlists
+      : localWatchlists;
   const defaultWatchlist =
     watchlists.find(({ isDefault }) => isDefault) ?? watchlists[0];
   const country = watchlistCountry(selectedStock);
