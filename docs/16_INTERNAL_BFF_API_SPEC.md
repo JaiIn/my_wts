@@ -214,6 +214,18 @@ unknown enum은 원문을 보존한다. 정정·취소 action은 제공하지 �
 
 이 endpoint는 현재가·경고·장 정보·주문정보를 GET으로 조회할 수 있지만 Toss mutation을 호출하지 않는다. simulation ID, 만료, 확인문구, submit endpoint는 없다.
 
+요청은 수량 기반과 금액 기반을 `oneOf`로 구분한다.
+
+- 수량 기반: `quantity` 필수, `orderAmount` 금지, `timeInForce` 선택(기본 `DAY`)
+- `CLS`: 미국 LIMIT 수량 주문에만 허용
+- LIMIT: `price` 필수, MARKET: `price` 금지
+- 금액 기반: 미국 MARKET 전용이며 `BUY`, `SELL` 모두 허용
+- 금액 기반: `orderAmount` 필수, `quantity`·`price`·`timeInForce` 금지
+- 미국 소수 수량과 금액 주문의 정규장 여부는 request body가 아닌 trusted server-side context로 검증
+- 국내 지정가는 KRX 구간별 호가 단위를 적용하며 자동 반올림·절삭·보정하지 않음
+
+응답은 항상 `SIMULATION_ONLY`, `submitted=false`, `persisted=false`이고 실제 주문 제출이나 저장을 수행하지 않는다.
+
 ## 9. 조건주문 시뮬레이터
 
 ### POST `/simulations/conditional-orders`

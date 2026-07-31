@@ -90,7 +90,25 @@ type AmountOrder = {
 };
 ```
 
-`quantity`와 `orderAmount`를 동시에 보내지 않는다. LIMIT에는 price가 필요하고 MARKET에는 price를 보내지 않는다.
+`quantity`와 `orderAmount`를 동시에 보내지 않는다. 수량 주문의 `timeInForce`는 선택이며 생략 시 `DAY`, `CLS`는 미국 LIMIT에서만 허용한다. LIMIT에는 price가 필요하고 MARKET에는 price를 보내지 않는다.
+
+금액 주문은 미국 MARKET `BUY`/`SELL`을 허용한다. `timeInForce`, `price`, `quantity`를 보내지 않으며 정규장 여부는 사용자 입력이 아닌 trusted server-side context로 검증한다.
+
+국내 주식 지정가의 KRX 호가 단위는 다음과 같다.
+
+| 가격 구간 | 호가 단위 |
+|---|---:|
+| 2,000원 미만 | 1원 |
+| 2,000원 이상 5,000원 미만 | 5원 |
+| 5,000원 이상 20,000원 미만 | 10원 |
+| 20,000원 이상 50,000원 미만 | 50원 |
+| 50,000원 이상 200,000원 미만 | 100원 |
+| 200,000원 이상 500,000원 미만 | 500원 |
+| 500,000원 이상 | 1,000원 |
+
+경계는 상위 구간을 사용한다. [KRX 주식 매매제도](https://global.krx.co.kr/contents/GLB/06/0602/0602010201/GLB0602010201T3.jsp)를 기준으로 Decimal 배수를 검증하며 자동 반올림·절삭·보정하지 않는다.
+
+시뮬레이션 결과는 `SIMULATION_ONLY`, `submitted=false`, `persisted=false`이고 실제 주문을 제출하거나 저장하지 않는다.
 
 ## 7. Order status
 

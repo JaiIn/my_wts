@@ -118,6 +118,10 @@ cancelConditionalOrder
 - SINGLE/OCO/OTO validation
 - buying power·sellable·경고 GET 참고
 - `SIMULATION_ONLY`, `submitted=false`, `persisted=false`
+- 수량 주문 TIF는 선택이며 생략 시 `DAY`; `CLS`는 미국 LIMIT에만 허용
+- 금액 주문은 미국 MARKET `BUY`/`SELL`이며 TIF·price·quantity를 받지 않음
+- 국내 지정가는 KRX 구간별 호가 단위를 Decimal로 검증하고 가격을 보정하지 않음
+- 정규장 여부는 request body가 아닌 trusted server-side context로 검증
 
 금지: preview ID, clientOrderId, 주문 제출, background 감시, 결과 저장.
 
@@ -144,4 +148,3 @@ cancelConditionalOrder
 ```text
 stage / 결과 / 변경 파일 / fast test / 안전 확인 / commit 후보 / 다음 stage / 사용자 승인 대기
 ```
-

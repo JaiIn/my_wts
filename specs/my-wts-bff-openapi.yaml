@@ -574,17 +574,43 @@ components:
       properties:
         accountRef: { type: string, minLength: 16, maxLength: 128 }
     OrderSimulationRequest:
+      oneOf:
+        - $ref: "#/components/schemas/QuantityOrderSimulationRequest"
+        - $ref: "#/components/schemas/AmountOrderSimulationRequest"
+    QuantityOrderSimulationRequest:
+      oneOf:
+        - $ref: "#/components/schemas/LimitQuantityOrderSimulationRequest"
+        - $ref: "#/components/schemas/MarketQuantityOrderSimulationRequest"
+    LimitQuantityOrderSimulationRequest:
       type: object
       additionalProperties: false
-      required: [symbol, side, orderType, timeInForce]
+      required: [symbol, side, orderType, quantity, price]
       properties:
         symbol: { $ref: "#/components/schemas/Symbol" }
         side: { type: string, enum: [BUY, SELL] }
-        orderType: { type: string, enum: [LIMIT, MARKET] }
-        timeInForce: { type: string, enum: [DAY, CLS] }
-        quantity: { type: string, pattern: "^[0-9]+(\\.[0-9]+)?$" }
-        orderAmount: { type: string, pattern: "^[0-9]+(\\.[0-9]+)?$" }
-        price: { type: string, pattern: "^[0-9]+(\\.[0-9]+)?$" }
+        orderType: { type: string, const: LIMIT }
+        timeInForce: { type: string, enum: [DAY, CLS], default: DAY }
+        quantity: { type: string, pattern: "^(?=.*[1-9])[0-9]+(\\.[0-9]+)?$", maxLength: 30 }
+        price: { type: string, pattern: "^(?=.*[1-9])[0-9]+(\\.[0-9]+)?$", maxLength: 30 }
+    MarketQuantityOrderSimulationRequest:
+      type: object
+      additionalProperties: false
+      required: [symbol, side, orderType, quantity]
+      properties:
+        symbol: { $ref: "#/components/schemas/Symbol" }
+        side: { type: string, enum: [BUY, SELL] }
+        orderType: { type: string, const: MARKET }
+        timeInForce: { type: string, const: DAY, default: DAY }
+        quantity: { type: string, pattern: "^(?=.*[1-9])[0-9]+(\\.[0-9]+)?$", maxLength: 30 }
+    AmountOrderSimulationRequest:
+      type: object
+      additionalProperties: false
+      required: [symbol, side, orderType, orderAmount]
+      properties:
+        symbol: { $ref: "#/components/schemas/Symbol" }
+        side: { type: string, enum: [BUY, SELL] }
+        orderType: { type: string, const: MARKET }
+        orderAmount: { type: string, pattern: "^(?=.*[1-9])[0-9]+(\\.[0-9]+)?$", maxLength: 30 }
     ConditionalSimulationRequest:
       type: object
       additionalProperties: false

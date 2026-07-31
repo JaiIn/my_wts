@@ -84,14 +84,33 @@ Content-Type: application/json
 - 기본 수량은 양의 정수
 - 미국 시장가 매도만 소수점 수량 허용, 최대 6자리, 정규장만
 - 미국 소수점 매수는 `orderAmount` 사용
-- `timeInForce`: 기본 `DAY`, 미국 LIMIT + `CLS`는 LOC
+- 수량 주문의 `timeInForce`는 선택이며 생략 시 `DAY`
+- `CLS`는 미국 LIMIT 수량 주문에서만 LOC로 허용
+
+국내 주식 지정가는 KRX 주식 호가 단위를 사용한다.
+
+| 가격 구간 | 호가 단위 |
+|---|---:|
+| 2,000원 미만 | 1원 |
+| 2,000원 이상 5,000원 미만 | 5원 |
+| 5,000원 이상 20,000원 미만 | 10원 |
+| 20,000원 이상 50,000원 미만 | 50원 |
+| 50,000원 이상 200,000원 미만 | 100원 |
+| 200,000원 이상 500,000원 미만 | 500원 |
+| 500,000원 이상 | 1,000원 |
+
+경계값에는 상위 구간의 호가 단위를 적용한다. 가격은 양의 정수이며 Decimal로 배수를 검증하고 자동 반올림·절삭·보정하지 않는다. 근거: [KRX 주식 매매제도](https://global.krx.co.kr/contents/GLB/06/0602/0602010201/GLB0602010201T3.jsp).
 
 ### 금액 기반
 
 - 미국 시장가 전용
 - `orderAmount` 필수
+- `BUY`, `SELL` 모두 허용
+- `timeInForce`, `price`, `quantity` 전달 금지
 - 정규장에만 접수
 - 금액은 고정되고 체결 수량이 변동
+
+정규장 여부는 사용자 요청값이 아니라 server-side market calendar/read 결과를 trusted validation context로 전달한다.
 
 ### 멱등성
 
@@ -227,3 +246,5 @@ persisted = false
 ```
 
 simulation ID, confirmation text, 만료, consume, submit 단계는 없다.
+
+시뮬레이션 validator는 가격·수량 원문을 반올림하거나 절삭하지 않는다. 결과는 항상 `SIMULATION_ONLY`, `submitted=false`, `persisted=false`이며 실제 제출·저장은 없다.
