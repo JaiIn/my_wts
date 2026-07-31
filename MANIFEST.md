@@ -51,7 +51,7 @@ Official API snapshot: Toss OpenAPI `1.2.4`
 
 | File | SHA-256 |
 |---|---|
-| `specs/my-wts-bff-openapi.yaml` | `f8661e3310a3180e867cd437046cc327cafacd95085250843ec5e178d9bb4ede` |
+| `specs/my-wts-bff-openapi.yaml` | `de463c061fd68f23649131dea05fd89515f569bd7925f277ca65e2d822dcf1c1` |
 | `specs/sqlite-schema-v1.sql` | `e05e3f26862fc12631400d0c75e281d979b2b392a5d37def146b7e1e2d1a0931` |
 | `templates/.env.example` | `0db210cdb59ea2e20ca27d32a0b91cb3947969d54c8ea4574c10efe217f2798f` |
 

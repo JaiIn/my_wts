@@ -334,6 +334,12 @@ paths:
       parameters:
         - $ref: "#/components/parameters/HistoryStatus"
         - $ref: "#/components/parameters/OptionalSymbol"
+        - name: from
+          in: query
+          schema: { type: string, format: date }
+        - name: to
+          in: query
+          schema: { type: string, format: date }
         - $ref: "#/components/parameters/Cursor"
         - $ref: "#/components/parameters/Limit"
       responses: { "200": { $ref: "#/components/responses/GenericSuccess" }, "400": { $ref: "#/components/responses/BadRequest" }, "401": { $ref: "#/components/responses/Unauthorized" }, "409": { $ref: "#/components/responses/Conflict" }, "502": { $ref: "#/components/responses/BadGateway" } }
