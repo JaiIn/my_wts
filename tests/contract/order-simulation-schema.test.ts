@@ -69,12 +69,53 @@ describe("order simulation BFF schema", () => {
     expect(amount).not.toMatch(/^\s+(?:quantity|price|timeInForce):/m);
   });
 
-  it("does not add trusted regular-session context or Toss mutation operations", () => {
+  it("defines the exact calculation result without success or persistence identifiers", () => {
+    const response = schemaSection(
+      "OrderSimulationResponse",
+      "CalculatedDecimal",
+    );
+    for (const field of [
+      "kind",
+      "currency",
+      "sizingMode",
+      "estimatedOrderAmount",
+      "estimatedCommission",
+      "estimatedCashAmount",
+      "cashDirection",
+      "taxIncluded",
+      "fxApplied",
+      "calculationPrice",
+      "referencePriceAsOf",
+      "submitted",
+      "persisted",
+    ]) {
+      expect(response).toContain(field);
+    }
+    expect(response).toContain("taxIncluded: { type: boolean, const: false }");
+    expect(response).toContain("fxApplied: { type: boolean, const: false }");
+    expect(response).toContain("submitted: { type: boolean, const: false }");
+    expect(response).toContain("persisted: { type: boolean, const: false }");
+    expect(response).not.toMatch(
+      /\b(?:orderId|conditionalOrderId|clientOrderId|previewId|executionId)\b/,
+    );
+  });
+
+  it("does not add trusted calculation context or Toss mutation operations", () => {
     const request = specification.slice(
       specification.indexOf("    OrderSimulationRequest:"),
       specification.indexOf("    ConditionalSimulationRequest:"),
     );
-    expect(request).not.toContain("isRegularSession");
+    for (const field of [
+      "isRegularSession",
+      "referencePrice",
+      "referencePriceCurrency",
+      "referencePriceAsOf",
+      "calculationDateKst",
+      "commissionRules",
+      "exchangeRate",
+    ]) {
+      expect(request).not.toContain(field);
+    }
     expect(specification).not.toContain("operationId: createOrder");
     expect(specification).not.toContain("operationId: modifyOrder");
     expect(specification).not.toContain("operationId: cancelOrder");

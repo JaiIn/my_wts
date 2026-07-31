@@ -13,6 +13,8 @@ describe("simulation order safety boundary", () => {
   const production = [
     source("src/domain/simulation/order-sizing.ts"),
     source("src/domain/simulation/order-rules.ts"),
+    source("src/domain/simulation/order-estimate.ts"),
+    source("src/application/simulation/order-estimate-service.ts"),
   ].join("\n");
 
   it("keeps validation pure and free of runtime, persistence, and credential access", () => {
@@ -20,7 +22,10 @@ describe("simulation order safety boundary", () => {
       /fetch\s*\(|https?:\/\/|process\.env|TOSS_CLIENT|Authorization|TokenManager|accountSeq|localStorage|sessionStorage|indexedDB/i,
     );
     expect(production).not.toMatch(
-      /\b(?:database|repository|insert|update|delete|persist|scheduler|worker|setInterval)\b/i,
+      /\b(?:database|repository|insert|update|delete|scheduler|worker|setInterval)\b/i,
+    );
+    expect(production).not.toMatch(
+      /node:fs|readFile|writeFile|Date\.now|new Date|Math\.random|randomUUID/,
     );
   });
 
@@ -41,5 +46,19 @@ describe("simulation order safety boundary", () => {
     );
     expect(requestSchema).not.toContain("isRegularSession");
     expect(rules).toContain("trustedContextSchema");
+  });
+
+  it("keeps estimate output permanently non-submitted and non-persisted", () => {
+    const estimate = source(
+      "src/application/simulation/order-estimate-service.ts",
+    );
+    expect(estimate).toContain('kind: "SIMULATION_ONLY"');
+    expect(estimate).toContain("submitted: false");
+    expect(estimate).toContain("persisted: false");
+    expect(estimate).toContain("taxIncluded: false");
+    expect(estimate).toContain("fxApplied: false");
+    expect(estimate).not.toMatch(
+      /\b(?:orderId|conditionalOrderId|clientOrderId|previewId|executionId)\b/,
+    );
   });
 });
